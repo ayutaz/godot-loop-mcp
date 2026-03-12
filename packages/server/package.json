@@ -27,7 +27,8 @@
     "dev": "node --experimental-strip-types --watch src/index.ts",
     "pack": "npm pack",
     "typecheck": "tsc -p tsconfig.json",
-    "smoke:m1": "node --experimental-strip-types src/dev/m1Smoke.ts"
+    "smoke:m1": "node --experimental-strip-types src/dev/m1Smoke.ts",
+    "smoke:m2": "node --experimental-strip-types src/dev/m2Smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",

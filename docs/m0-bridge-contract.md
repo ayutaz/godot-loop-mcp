@@ -83,9 +83,13 @@ M0 では Addon が `enabled` と `planned` の両方を送って構いません
 - `project.info` (`enabled`)
 - `editor.state` (`enabled`)
 - `scene.read` (`enabled`)
+- `scene.write` (`enabled`)
 - `script.read` (`enabled`)
+- `script.write` (`enabled`)
 - `logs.read` (`enabled`)
+- `logs.clear` (`enabled`)
 - `editor.console.capture` (`enabled` on `Godot 4.5+`, `disabled` on `4.4`)
+- `play.control` (`enabled`)
 - `runtime.debug` (`planned`)
 
 ## Security Levels
@@ -94,7 +98,7 @@ M0 では Addon が `enabled` と `planned` の両方を送って構いません
 - `WorkspaceWrite`: 通常の scene/script 編集と保存
 - `Dangerous`: 任意コード実行や OS 操作を含む
 
-M0 の実装は Addon / server ともに `ReadOnly` 固定です。
+M0 の初期実装は `ReadOnly` 固定でしたが、現行 branch では `M2` に合わせて Addon / server ともに `WorkspaceWrite` へ拡張済みです。
 
 ## Timeout / Reconnect
 

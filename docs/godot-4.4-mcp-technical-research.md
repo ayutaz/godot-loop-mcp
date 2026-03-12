@@ -14,7 +14,7 @@
 - 現行の CI/CD 計画: `docs/github-actions-cicd-plan.md`
 
 実装済みの範囲は `Addon skeleton + TypeScript server skeleton + localhost TCP bridge + handshake + bidirectional ping + capability logging + M1 read-only observation + 4.5+ editor console capture + GitHub Actions CI/CD groundwork` です。  
-この調査文書より現行挙動の source of truth を優先する場合は、上記文書と実装コードを参照してください。
+この調査文書より現行挙動の source of truth を優先する場合は、上記文書と実装コードを参照してください。2026-03-12 時点では `M0` から `M2` が実装済みで、現行挙動は `docs/m0-bridge-contract.md`, `docs/m1-local-development.md`, `docs/m2-local-development.md` を優先します。
 
 ## 結論
 

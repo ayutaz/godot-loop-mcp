@@ -2,10 +2,18 @@
 extends RefCounted
 
 const EditorConsoleCapture = preload("res://addons/godot_loop_mcp/observation/editor_console_capture.gd")
+const ADDON_LOG_PATH := "res://.godot/mcp/addon.log"
+const RUNTIME_LOG_PATH := "res://.godot/mcp/runtime.log"
+const LOG_BACKEND_RUNTIME := "runtime-log-file"
+const LOG_LEVEL_INFO := "INFO"
+const LOG_LEVEL_WARNING := "WARNING"
+const LOG_LEVEL_ERROR := "ERROR"
+const LOG_SOURCE_RUNTIME := "runtime"
 
 var _editor_interface: EditorInterface
 var _workspace_root := ""
 var _console_capture
+var _runtime_state_provider: Callable
 
 
 func _init(editor_interface: EditorInterface, workspace_root: String) -> void:
@@ -18,6 +26,10 @@ func dispose() -> void:
 	if _console_capture != null and _console_capture.has_method("dispose"):
 		_console_capture.dispose()
 	_console_capture = null
+
+
+func set_runtime_state_provider(provider: Callable) -> void:
+	_runtime_state_provider = provider
 
 
 func get_capability_overrides() -> Dictionary:
@@ -58,6 +70,8 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			return _get_output_logs(request_params)
 		"godot.logs.get_errors":
 			return _get_error_logs(request_params)
+		"godot.logs.clear":
+			return _clear_output_logs()
 		_:
 			return {"handled": false}
 
@@ -78,13 +92,20 @@ func _build_editor_state() -> Dictionary:
 	var scene_root := _editor_interface.get_edited_scene_root()
 	var current_script := _get_current_script()
 	var playing_scene_path := str(_editor_interface.get_playing_scene())
+	var runtime_state := _get_runtime_state()
+	var runtime_scene_path := str(runtime_state.get("playingScenePath", ""))
+	if runtime_scene_path != "":
+		playing_scene_path = runtime_scene_path
+	var is_playing_scene := bool(runtime_state.get("isPlayingScene", false)) or playing_scene_path != ""
 	return {
 		"workspaceRoot": _workspace_root,
 		"currentScenePath": _get_current_scene_path(),
 		"currentSceneRootName": scene_root.name if scene_root != null else "",
 		"openScenePaths": _to_string_array(_editor_interface.get_open_scenes()),
 		"playingScenePath": playing_scene_path,
-		"isPlayingScene": playing_scene_path != "",
+		"isPlayingScene": is_playing_scene,
+		"runtimeMode": str(runtime_state.get("runtimeMode", "")),
+		"runtimeLogPath": str(runtime_state.get("runtimeLogPath", "")),
 		"selectedNodePaths": _get_selected_node_paths(),
 		"currentScriptPath": _get_script_path(current_script),
 		"openScriptPaths": _get_open_script_paths()
@@ -176,17 +197,164 @@ func _view_script(params: Dictionary) -> Dictionary:
 
 
 func _get_output_logs(params: Dictionary) -> Dictionary:
-	if not _is_console_capture_enabled():
-		return _error(-32005, "Editor console capture is unavailable.", get_console_capture_status())
-
-	return _ok(_console_capture.get_output_payload(int(params.get("limit", 100))))
+	return _read_logs(params, false)
 
 
 func _get_error_logs(params: Dictionary) -> Dictionary:
-	if not _is_console_capture_enabled():
-		return _error(-32005, "Editor console capture is unavailable.", get_console_capture_status())
+	return _read_logs(params, true)
 
-	return _ok(_console_capture.get_error_payload(int(params.get("limit", 100))))
+
+func _clear_output_logs() -> Dictionary:
+	var cleared_capture_entries := 0
+	if _console_capture != null and _console_capture.has_method("clear_entries"):
+		cleared_capture_entries = int(_console_capture.clear_entries())
+
+	var addon_log_path := ProjectSettings.globalize_path(ADDON_LOG_PATH)
+	var truncated_addon_log := false
+	var addon_dir_error := DirAccess.make_dir_recursive_absolute(addon_log_path.get_base_dir())
+	if addon_dir_error == OK:
+		var file := FileAccess.open(addon_log_path, FileAccess.WRITE)
+		if file != null:
+			file.close()
+			truncated_addon_log = true
+
+	var runtime_log_path := _resolve_runtime_log_path(_get_runtime_state())
+	var truncated_runtime_log := false
+	var runtime_dir_error := DirAccess.make_dir_recursive_absolute(runtime_log_path.get_base_dir())
+	if runtime_log_path != "" and runtime_dir_error == OK:
+		var runtime_file := FileAccess.open(runtime_log_path, FileAccess.WRITE)
+		if runtime_file != null:
+			runtime_file.close()
+			truncated_runtime_log = true
+
+	return _ok(
+		{
+			"clearedCaptureEntries": cleared_capture_entries,
+			"addonLogPath": addon_log_path,
+			"truncatedAddonLog": truncated_addon_log,
+			"runtimeLogPath": runtime_log_path,
+			"truncatedRuntimeLog": truncated_runtime_log
+		}
+	)
+
+
+func _read_logs(params: Dictionary, errors_only: bool) -> Dictionary:
+	var limit := maxi(int(params.get("limit", 100)), 1)
+	var runtime_state := _get_runtime_state()
+	var runtime_log_path := _resolve_runtime_log_path(runtime_state)
+	var runtime_entries := _read_runtime_log_entries(runtime_log_path, errors_only, limit)
+	var runtime_active := bool(runtime_state.get("isPlayingScene", false)) or (
+		str(runtime_state.get("runtimeMode", "")) == "external-process"
+	)
+	if runtime_active or not runtime_entries.is_empty():
+		return _ok(_build_runtime_log_payload(runtime_state, runtime_entries, errors_only))
+
+	if _is_console_capture_enabled():
+		if errors_only:
+			return _ok(_console_capture.get_error_payload(limit))
+		return _ok(_console_capture.get_output_payload(limit))
+
+	var capture_status := get_console_capture_status()
+	capture_status["runtimeLogPath"] = runtime_log_path
+	capture_status["runtimeMode"] = str(runtime_state.get("runtimeMode", ""))
+	return _error(-32005, "No editor or runtime log capture is available.", capture_status)
+
+
+func _build_runtime_log_payload(
+	runtime_state: Dictionary,
+	entries: Array[Dictionary],
+	errors_only: bool
+) -> Dictionary:
+	var note := (
+		"Reads runtime log entries written by the headless external play process."
+		if not errors_only
+		else "Reads error-level runtime log entries written by the headless external play process."
+	)
+	return {
+		"note": note,
+		"backend": LOG_BACKEND_RUNTIME,
+		"captureAvailable": bool(get_console_capture_status().get("supported", false)),
+		"captureUsed": false,
+		"runtimeMode": str(runtime_state.get("runtimeMode", "")),
+		"runtimeLogPath": _resolve_runtime_log_path(runtime_state),
+		"entries": entries
+	}
+
+
+func _read_runtime_log_entries(
+	runtime_log_path: String,
+	errors_only: bool,
+	limit: int
+) -> Array[Dictionary]:
+	if runtime_log_path == "":
+		return []
+
+	var file := FileAccess.open(runtime_log_path, FileAccess.READ)
+	if file == null:
+		return []
+
+	var content := file.get_as_text()
+	file.close()
+
+	var entries: Array[Dictionary] = []
+	for raw_line in content.split("\n", false):
+		var line := str(raw_line).strip_edges()
+		if line == "":
+			continue
+		var entry := _parse_runtime_log_line(line)
+		if errors_only and str(entry.get("level", "")) != LOG_LEVEL_ERROR:
+			continue
+		entries.append(entry)
+
+	return _take_last_entries(entries, limit)
+
+
+func _parse_runtime_log_line(line: String) -> Dictionary:
+	return {
+		"source": LOG_SOURCE_RUNTIME,
+		"timestamp": "",
+		"level": _infer_runtime_log_level(line),
+		"message": line,
+		"raw": line
+	}
+
+
+func _infer_runtime_log_level(line: String) -> String:
+	var lower := line.to_lower()
+	if lower.contains("error:") or lower.contains("script error") or lower.contains("user error"):
+		return LOG_LEVEL_ERROR
+	if lower.contains("warning:"):
+		return LOG_LEVEL_WARNING
+	return LOG_LEVEL_INFO
+
+
+func _take_last_entries(entries: Array[Dictionary], limit: int) -> Array[Dictionary]:
+	var clamped_limit := maxi(limit, 1)
+	var start := maxi(entries.size() - clamped_limit, 0)
+	var tail: Array[Dictionary] = []
+	for index in range(start, entries.size()):
+		tail.append(entries[index])
+	return tail
+
+
+func _get_runtime_state() -> Dictionary:
+	if _runtime_state_provider.is_valid():
+		var runtime_state: Variant = _runtime_state_provider.call()
+		if typeof(runtime_state) == TYPE_DICTIONARY:
+			return runtime_state
+	return {
+		"isPlayingScene": false,
+		"playingScenePath": "",
+		"runtimeLogPath": ProjectSettings.globalize_path(RUNTIME_LOG_PATH),
+		"runtimeMode": ""
+	}
+
+
+func _resolve_runtime_log_path(runtime_state: Dictionary) -> String:
+	var runtime_log_path := str(runtime_state.get("runtimeLogPath", "")).strip_edges()
+	if runtime_log_path != "":
+		return runtime_log_path
+	return ProjectSettings.globalize_path(RUNTIME_LOG_PATH)
 
 
 func _serialize_node(node: Node, max_depth: int, depth: int) -> Dictionary:

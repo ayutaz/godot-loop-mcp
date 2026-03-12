@@ -206,6 +206,11 @@ PR で回す job:
 - 破壊的な編集検証は使い捨て fixture project 上でのみ実行する
 - PR CI では 1 本の短い golden path に絞る
 
+現状メモ:
+
+- ローカルでは `smoke:m2` を実装済み
+- Windows headless では `play_scene` が external runtime process を起動し、`runtime-log-file` backend を検証対象にする
+
 ### Phase D: M4 Verification CI
 
 開始条件:

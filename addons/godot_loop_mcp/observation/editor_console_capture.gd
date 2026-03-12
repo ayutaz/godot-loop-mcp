@@ -79,6 +79,12 @@ func get_status_payload() -> Dictionary:
 	return payload
 
 
+func clear_entries() -> int:
+	var cleared_count := _entry_count()
+	_clear_entries()
+	return cleared_count
+
+
 func get_output_payload(limit: int = 100) -> Dictionary:
 	return _build_payload(
 		_take_last(_snapshot_entries(), limit),
@@ -263,6 +269,13 @@ func _clear_entries() -> void:
 	_mutex.lock()
 	_entries.clear()
 	_mutex.unlock()
+
+
+func _entry_count() -> int:
+	_mutex.lock()
+	var count := _entries.size()
+	_mutex.unlock()
+	return count
 
 
 func _sanitize_text(value: String) -> String:

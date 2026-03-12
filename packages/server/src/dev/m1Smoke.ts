@@ -48,6 +48,9 @@ async function main(): Promise<void> {
     assertString(projectInfo.godotVersion, "godotVersion");
     const expectsEditorConsoleCapture = supportsEditorConsoleCapture(projectInfo.godotVersion);
 
+    console.error("Clearing logs...");
+    await callToolJson(client, "clear_output_logs");
+
     console.error("Checking tool catalog...");
     const tools = await client.listTools();
     assertContains(tools.tools.map((tool) => tool.name), "get_project_info", "tool list");

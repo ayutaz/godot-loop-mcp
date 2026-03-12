@@ -4,6 +4,7 @@ extends EditorPlugin
 const BridgeClient = preload("res://addons/godot_loop_mcp/bridge/bridge_client.gd")
 const CapabilityRegistry = preload("res://addons/godot_loop_mcp/capabilities/capability_registry.gd")
 const ObservationService = preload("res://addons/godot_loop_mcp/observation/observation_service.gd")
+const WorkspaceService = preload("res://addons/godot_loop_mcp/workspace/workspace_service.gd")
 
 const SETTING_BRIDGE_HOST := "godot_loop_mcp/bridge/host"
 const SETTING_BRIDGE_PORT := "godot_loop_mcp/bridge/port"
@@ -21,6 +22,7 @@ const LOG_FILE_NAME := "addon.log"
 var _bridge_client: RefCounted
 var _capability_registry: RefCounted
 var _observation_service: RefCounted
+var _workspace_service: RefCounted
 var _current_state := "disconnected"
 
 
@@ -41,6 +43,7 @@ func _exit_tree() -> void:
 	_append_log("info", "Plugin disabled.", {"state": _current_state})
 	_dispose_bridge_client()
 	_dispose_observation_service()
+	_dispose_workspace_service()
 	_bridge_client = null
 	_capability_registry = null
 	_observation_service = null
@@ -49,6 +52,8 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _bridge_client != null:
 		_bridge_client.poll(delta)
+	if _workspace_service != null and _workspace_service.has_method("poll"):
+		_workspace_service.poll(delta)
 
 
 func _on_connect_requested() -> void:
@@ -63,13 +68,17 @@ func _on_disconnect_requested() -> void:
 func _start_bridge() -> void:
 	_dispose_bridge_client()
 	_dispose_observation_service()
+	_dispose_workspace_service()
 	_observation_service = ObservationService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
+	_workspace_service = WorkspaceService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
+	if _observation_service != null and _observation_service.has_method("set_runtime_state_provider"):
+		_observation_service.set_runtime_state_provider(Callable(_workspace_service, "get_runtime_state"))
 	_capability_registry = CapabilityRegistry.new()
 	_append_log("info", "Observation capabilities updated.", _observation_service.get_console_capture_status())
 	_bridge_client = BridgeClient.new(
 		_build_bridge_config(),
 		_build_client_identity(),
-		Callable(_observation_service, "handle_request")
+		Callable(self, "_handle_bridge_request")
 	)
 	_bridge_client.log_emitted.connect(_on_bridge_log_emitted)
 	_bridge_client.state_changed.connect(_on_bridge_state_changed)
@@ -95,6 +104,26 @@ func _dispose_observation_service() -> void:
 	if _observation_service.has_method("dispose"):
 		_observation_service.dispose()
 	_observation_service = null
+
+
+func _dispose_workspace_service() -> void:
+	if _workspace_service == null:
+		return
+	if _workspace_service.has_method("dispose"):
+		_workspace_service.dispose()
+	_workspace_service = null
+
+
+func _handle_bridge_request(method: String, params: Variant = {}) -> Dictionary:
+	if _observation_service != null:
+		var observation_result: Dictionary = _observation_service.handle_request(method, params)
+		if typeof(observation_result) == TYPE_DICTIONARY and bool(observation_result.get("handled", false)):
+			return observation_result
+
+	if _workspace_service != null:
+		return _workspace_service.handle_request(method, params)
+
+	return {"handled": false}
 
 
 func _on_bridge_log_emitted(level: String, message: String, context: Dictionary = {}) -> void:

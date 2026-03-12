@@ -8,7 +8,7 @@ import type {
 
 export const PROTOCOL_VERSION = "0.1.0";
 export const SERVER_VERSION = "0.1.0";
-export const SERVER_SECURITY_LEVEL: SecurityLevel = "ReadOnly";
+export const SERVER_SECURITY_LEVEL: SecurityLevel = "WorkspaceWrite";
 
 export function buildServerCapabilityManifest(): CapabilityManifest {
   return {
@@ -31,13 +31,13 @@ export function buildServerCapabilityManifest(): CapabilityManifest {
         id: "mcp.tools",
         surface: "tool",
         availability: "enabled",
-        description: "Read-only MCP tool exposure is enabled."
+        description: "WorkspaceWrite MCP tool exposure is enabled."
       },
       {
         id: "mcp.resources",
         surface: "resource",
         availability: "enabled",
-        description: "Core Godot resources are exposed in M1."
+        description: "Core Godot resources are exposed for the current editor workspace."
       }
     ]
   };

@@ -12,15 +12,16 @@ The project is intended to provide:
 
 ## Status
 
-This repository is still in the bootstrap phase, but `M0` and `M1` are complete and `M5` CI/CD groundwork is in progress.
+This repository is still in the bootstrap phase, but `M0` through `M2` are complete and `M5` CI/CD groundwork is in progress.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
 - Implemented: addon skeleton, TypeScript server skeleton, `handshake`, bidirectional `ping`, capability manifest, reconnect policy
 - Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, and release-asset scaffolding
 - Implemented: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, and MCP tool error hardening
-- Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, with `.godot/mcp` fallback on `4.4`
-- Next target: the `M2` edit/play loop
+- Implemented: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, and `smoke:m2`
+- Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, headless play output via `.godot/mcp/runtime.log`, and `.godot/mcp` fallback on `4.4`
+- Next target: `M3` search / UID / dynamic capabilities
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -69,6 +70,24 @@ Verified commands:
 npm --prefix packages/server run typecheck
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm --prefix packages/server run smoke:m1
+```
+
+## M2 Edit/Play
+
+The M2 edit/play loop is now implemented.
+
+- Guide: [docs/m2-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m2-local-development.md)
+- tools: `create_scene`, `open_scene`, `save_scene`, `play_scene`, `stop_scene`, `add_node`, `move_node`, `delete_node`, `update_property`, `create_script`, `attach_script`, `clear_output_logs`
+- security level: `WorkspaceWrite`
+- headless play: launches a separate Godot runtime process and writes runtime output to `.godot/mcp/runtime.log`
+- logs: when external play output exists, `get_output_logs` / `get_godot_errors` return the `runtime-log-file` backend
+
+Verified commands:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m2
 ```
 
 ## License

@@ -3,7 +3,7 @@ extends RefCounted
 
 const PROTOCOL_VERSION := "0.1.0"
 const PLUGIN_VERSION := "0.1.0"
-const SECURITY_LEVEL := "ReadOnly"
+const SECURITY_LEVEL := "WorkspaceWrite"
 
 
 func build_manifest(capability_overrides: Dictionary = {}) -> Dictionary:
@@ -43,10 +43,22 @@ func build_manifest(capability_overrides: Dictionary = {}) -> Dictionary:
 				"description": "Exposes the current scene tree for read-only inspection."
 			},
 			{
+				"id": "scene.write",
+				"surface": "tool",
+				"availability": "enabled",
+				"description": "Exposes scene creation and node editing in the workspace."
+			},
+			{
 				"id": "script.read",
 				"surface": "tool",
 				"availability": "enabled",
 				"description": "Exposes open script inspection in the editor."
+			},
+			{
+				"id": "script.write",
+				"surface": "tool",
+				"availability": "enabled",
+				"description": "Creates scripts and attaches them to scene nodes."
 			},
 			{
 				"id": "logs.read",
@@ -55,10 +67,22 @@ func build_manifest(capability_overrides: Dictionary = {}) -> Dictionary:
 				"description": "Exposes log inspection with addon/server fallback."
 			},
 			{
+				"id": "logs.clear",
+				"surface": "tool",
+				"availability": "enabled",
+				"description": "Clears addon-side editor console buffers and log files."
+			},
+			{
 				"id": "editor.console.capture",
 				"surface": "tool",
 				"availability": editor_console_capture,
 				"description": "Captures editor console messages through OS.add_logger() on Godot 4.5+."
+			},
+			{
+				"id": "play.control",
+				"surface": "tool",
+				"availability": "enabled",
+				"description": "Controls play and stop actions for the edited scene."
 			},
 			{
 				"id": "runtime.debug",

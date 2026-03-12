@@ -48,6 +48,66 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     description: "Read the current script or a script by path."
   },
   {
+    name: "create_scene",
+    bridgeMethod: "godot.scene.create",
+    description: "Create and open a new scene inside the workspace."
+  },
+  {
+    name: "open_scene",
+    bridgeMethod: "godot.scene.open",
+    description: "Open an existing scene by path."
+  },
+  {
+    name: "save_scene",
+    bridgeMethod: "godot.scene.save",
+    description: "Save the current edited scene."
+  },
+  {
+    name: "play_scene",
+    bridgeMethod: "godot.scene.play",
+    description: "Play the current edited scene or a specific saved scene."
+  },
+  {
+    name: "stop_scene",
+    bridgeMethod: "godot.scene.stop",
+    description: "Stop the currently playing scene."
+  },
+  {
+    name: "add_node",
+    bridgeMethod: "godot.scene.add_node",
+    description: "Add a node to the current edited scene."
+  },
+  {
+    name: "move_node",
+    bridgeMethod: "godot.scene.move_node",
+    description: "Move a node to a new parent or sibling index."
+  },
+  {
+    name: "delete_node",
+    bridgeMethod: "godot.scene.delete_node",
+    description: "Delete a node from the current edited scene."
+  },
+  {
+    name: "update_property",
+    bridgeMethod: "godot.scene.update_property",
+    description: "Update a node property in the current edited scene."
+  },
+  {
+    name: "create_script",
+    bridgeMethod: "godot.script.create",
+    description: "Create a new GDScript file in the workspace."
+  },
+  {
+    name: "attach_script",
+    bridgeMethod: "godot.script.attach",
+    description: "Attach a script to a node in the current edited scene."
+  },
+  {
+    name: "clear_output_logs",
+    bridgeMethod: "godot.logs.clear",
+    description: "Clear addon console buffers and bridge log files."
+  },
+  {
     name: "get_output_logs",
     description: "Read editor console logs when available, otherwise fall back to .godot/mcp."
   },

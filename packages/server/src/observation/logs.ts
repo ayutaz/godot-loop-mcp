@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export type LogSource = "addon" | "server" | "editor-console";
-type LogBackend = "bridge-log-fallback" | "editor-console-buffer";
+export type LogSource = "addon" | "server" | "editor-console" | "runtime";
+type LogBackend = "bridge-log-fallback" | "editor-console-buffer" | "runtime-log-file";
 
 export interface OutputLogEntry {
   source: LogSource;
@@ -30,7 +30,8 @@ interface FallbackLogOptions {
 
 const LOG_FILES: Array<{ source: LogSource; fileName: string }> = [
   { source: "addon", fileName: "addon.log" },
-  { source: "server", fileName: "server.log" }
+  { source: "server", fileName: "server.log" },
+  { source: "runtime", fileName: "runtime.log" }
 ];
 
 export function readOutputLogs(
@@ -40,7 +41,7 @@ export function readOutputLogs(
 ): OutputLogPayload {
   const entries = readMergedEntries(logDir, limit);
   return {
-    note: options.note ?? "Current implementation reads addon/server bridge logs from .godot/mcp.",
+    note: options.note ?? "Current implementation reads addon/server/runtime logs from .godot/mcp.",
     backend: "bridge-log-fallback",
     captureAvailable: options.captureAvailable ?? false,
     captureUsed: false,
@@ -62,7 +63,7 @@ export function readErrorLogs(
   return {
     note:
       options.note ??
-      "Current implementation filters error-level addon/server bridge logs from .godot/mcp.",
+      "Current implementation filters error-level addon/server/runtime logs from .godot/mcp.",
     backend: "bridge-log-fallback",
     captureAvailable: options.captureAvailable ?? false,
     captureUsed: false,
@@ -100,7 +101,7 @@ function parseLine(line: string, source: LogSource): OutputLogEntry {
     return {
       source,
       timestamp: "",
-      level: "UNKNOWN",
+      level: inferLevel(line),
       message: line,
       raw: line
     };
@@ -114,4 +115,15 @@ function parseLine(line: string, source: LogSource): OutputLogEntry {
     message,
     raw: line
   };
+}
+
+function inferLevel(line: string): string {
+  const lower = line.toLowerCase();
+  if (lower.includes("error:") || lower.includes("script error") || lower.includes("user error")) {
+    return "ERROR";
+  }
+  if (lower.includes("warning:")) {
+    return "WARNING";
+  }
+  return "INFO";
 }
