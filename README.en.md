@@ -12,15 +12,28 @@ The project is intended to provide:
 
 ## Status
 
-This repository is in the bootstrap phase.
+This repository is still in the bootstrap phase, but `M0` is complete.
 
-The initial target is a Godot 4.4+ design inspired by Unity's uLoopMCP:
+The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
-- editor-aware scene and script inspection
-- runtime error and log collection
-- play / stop control
-- project and resource search
-- staged automation with explicit safety boundaries
+- Implemented: addon skeleton, TypeScript server skeleton, `handshake`, bidirectional `ping`, capability manifest, reconnect policy
+- Next target: `M1` read-only observation tools/resources
+- Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
+
+## M0 Bootstrap
+
+The initial M0 bridge scaffolding is implemented and smoke-tested.
+
+- Contract: [docs/m0-bridge-contract.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m0-bridge-contract.md)
+- Local development: [docs/m0-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m0-local-development.md)
+- Milestones: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
+
+Verified minimal smoke test:
+
+```powershell
+npm --prefix packages/server run start
+godot_console.exe --headless --editor --quit-after 240 --path .
+```
 
 ## License
 

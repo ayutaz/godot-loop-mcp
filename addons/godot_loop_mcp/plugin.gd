@@ -1,0 +1,217 @@
+@tool
+extends EditorPlugin
+
+const BridgeClient = preload("res://addons/godot_loop_mcp/bridge/bridge_client.gd")
+const CapabilityRegistry = preload("res://addons/godot_loop_mcp/capabilities/capability_registry.gd")
+
+const SETTING_BRIDGE_HOST := "godot_loop_mcp/bridge/host"
+const SETTING_BRIDGE_PORT := "godot_loop_mcp/bridge/port"
+const SETTING_CONNECT_ON_START := "godot_loop_mcp/bridge/connect_on_start"
+const SETTING_CONNECT_TIMEOUT_MS := "godot_loop_mcp/bridge/connect_timeout_ms"
+const SETTING_HANDSHAKE_TIMEOUT_MS := "godot_loop_mcp/bridge/handshake_timeout_ms"
+const SETTING_RECONNECT_INITIAL_DELAY_MS := "godot_loop_mcp/bridge/reconnect_initial_delay_ms"
+const SETTING_RECONNECT_MAX_DELAY_MS := "godot_loop_mcp/bridge/reconnect_max_delay_ms"
+
+const MENU_CONNECT := "Godot Loop MCP: Connect"
+const MENU_DISCONNECT := "Godot Loop MCP: Disconnect"
+const LOG_DIR := "res://.godot/mcp"
+const LOG_FILE_NAME := "addon.log"
+
+var _bridge_client: RefCounted
+var _capability_registry: RefCounted
+var _current_state := "disconnected"
+
+
+func _enter_tree() -> void:
+	_register_project_settings()
+	add_tool_menu_item(MENU_CONNECT, Callable(self, "_on_connect_requested"))
+	add_tool_menu_item(MENU_DISCONNECT, Callable(self, "_on_disconnect_requested"))
+	set_process(true)
+	_append_log("info", "Plugin enabled.", {"project": _get_project_name()})
+	if bool(ProjectSettings.get_setting(SETTING_CONNECT_ON_START, true)):
+		_start_bridge()
+
+
+func _exit_tree() -> void:
+	set_process(false)
+	remove_tool_menu_item(MENU_CONNECT)
+	remove_tool_menu_item(MENU_DISCONNECT)
+	_append_log("info", "Plugin disabled.", {"state": _current_state})
+	_dispose_bridge_client()
+	_bridge_client = null
+	_capability_registry = null
+
+
+func _process(delta: float) -> void:
+	if _bridge_client != null:
+		_bridge_client.poll(delta)
+
+
+func _on_connect_requested() -> void:
+	_start_bridge()
+
+
+func _on_disconnect_requested() -> void:
+	_append_log("info", "Manual bridge disconnect requested.")
+	_dispose_bridge_client()
+
+
+func _start_bridge() -> void:
+	_dispose_bridge_client()
+	_capability_registry = CapabilityRegistry.new()
+	_bridge_client = BridgeClient.new(_build_bridge_config(), _build_client_identity())
+	_bridge_client.log_emitted.connect(_on_bridge_log_emitted)
+	_bridge_client.state_changed.connect(_on_bridge_state_changed)
+	_bridge_client.handshake_completed.connect(_on_handshake_completed)
+	_bridge_client.start()
+
+
+func _dispose_bridge_client() -> void:
+	if _bridge_client == null:
+		return
+	if _bridge_client.log_emitted.is_connected(_on_bridge_log_emitted):
+		_bridge_client.log_emitted.disconnect(_on_bridge_log_emitted)
+	if _bridge_client.state_changed.is_connected(_on_bridge_state_changed):
+		_bridge_client.state_changed.disconnect(_on_bridge_state_changed)
+	if _bridge_client.handshake_completed.is_connected(_on_handshake_completed):
+		_bridge_client.handshake_completed.disconnect(_on_handshake_completed)
+	_bridge_client.stop()
+
+
+func _on_bridge_log_emitted(level: String, message: String, context: Dictionary = {}) -> void:
+	_append_log(level, message, context)
+
+
+func _on_bridge_state_changed(state: String) -> void:
+	_current_state = state
+	_append_log("info", "Bridge state changed.", {"state": state})
+
+
+func _on_handshake_completed(server_identity: Dictionary) -> void:
+	var product := server_identity.get("product", {})
+	_append_log(
+		"info",
+		"Bridge handshake completed.",
+		{
+			"session_id": server_identity.get("sessionId", ""),
+			"server_name": product.get("name", ""),
+			"server_version": product.get("version", "")
+		}
+	)
+
+
+func _build_bridge_config() -> Dictionary:
+	return {
+		"host": str(ProjectSettings.get_setting(SETTING_BRIDGE_HOST, "127.0.0.1")),
+		"port": int(ProjectSettings.get_setting(SETTING_BRIDGE_PORT, 6010)),
+		"connect_timeout_ms": int(ProjectSettings.get_setting(SETTING_CONNECT_TIMEOUT_MS, 5000)),
+		"handshake_timeout_ms": int(ProjectSettings.get_setting(SETTING_HANDSHAKE_TIMEOUT_MS, 5000)),
+		"reconnect_initial_delay_ms": int(ProjectSettings.get_setting(SETTING_RECONNECT_INITIAL_DELAY_MS, 2000)),
+		"reconnect_max_delay_ms": int(ProjectSettings.get_setting(SETTING_RECONNECT_MAX_DELAY_MS, 10000))
+	}
+
+
+func _build_client_identity() -> Dictionary:
+	var reconnect_policy := {
+		"initialDelayMs": int(ProjectSettings.get_setting(SETTING_RECONNECT_INITIAL_DELAY_MS, 2000)),
+		"maxDelayMs": int(ProjectSettings.get_setting(SETTING_RECONNECT_MAX_DELAY_MS, 10000)),
+		"connectTimeoutMs": int(ProjectSettings.get_setting(SETTING_CONNECT_TIMEOUT_MS, 5000)),
+		"handshakeTimeoutMs": int(ProjectSettings.get_setting(SETTING_HANDSHAKE_TIMEOUT_MS, 5000)),
+		"idleTimeoutMs": 30000
+	}
+	return _capability_registry.build_client_identity(
+		ProjectSettings.globalize_path("res://"),
+		_format_godot_version(),
+		reconnect_policy
+	)
+
+
+func _register_project_settings() -> void:
+	_register_project_setting(SETTING_BRIDGE_HOST, "127.0.0.1", TYPE_STRING, PROPERTY_HINT_NONE, "")
+	_register_project_setting(SETTING_BRIDGE_PORT, 6010, TYPE_INT, PROPERTY_HINT_RANGE, "1,65535,1")
+	_register_project_setting(SETTING_CONNECT_ON_START, true, TYPE_BOOL, PROPERTY_HINT_NONE, "")
+	_register_project_setting(SETTING_CONNECT_TIMEOUT_MS, 5000, TYPE_INT, PROPERTY_HINT_RANGE, "1000,60000,100")
+	_register_project_setting(SETTING_HANDSHAKE_TIMEOUT_MS, 5000, TYPE_INT, PROPERTY_HINT_RANGE, "1000,60000,100")
+	_register_project_setting(
+		SETTING_RECONNECT_INITIAL_DELAY_MS,
+		2000,
+		TYPE_INT,
+		PROPERTY_HINT_RANGE,
+		"500,30000,100"
+	)
+	_register_project_setting(
+		SETTING_RECONNECT_MAX_DELAY_MS,
+		10000,
+		TYPE_INT,
+		PROPERTY_HINT_RANGE,
+		"1000,120000,100"
+	)
+
+
+func _register_project_setting(
+	setting_name: String,
+	default_value: Variant,
+	property_type: int,
+	hint: int,
+	hint_string: String
+) -> void:
+	if not ProjectSettings.has_setting(setting_name):
+		ProjectSettings.set_setting(setting_name, default_value)
+	ProjectSettings.add_property_info(
+		{
+			"name": setting_name,
+			"type": property_type,
+			"hint": hint,
+			"hint_string": hint_string
+		}
+	)
+	ProjectSettings.set_initial_value(setting_name, default_value)
+
+
+func _format_godot_version() -> String:
+	var version_info := Engine.get_version_info()
+	return "%s.%s.%s" % [
+		version_info.get("major", 4),
+		version_info.get("minor", 4),
+		version_info.get("patch", 0)
+	]
+
+
+func _get_project_name() -> String:
+	return str(ProjectSettings.get_setting("application/config/name", "godot-loop-mcp"))
+
+
+func _append_log(level: String, message: String, context: Dictionary = {}) -> void:
+	var payload := "[godot-loop-mcp][%s] %s" % [level.to_upper(), message]
+	if context.is_empty():
+		print(payload)
+	else:
+		print("%s %s" % [payload, JSON.stringify(context)])
+
+	var log_dir := ProjectSettings.globalize_path(LOG_DIR)
+	var dir_error := DirAccess.make_dir_recursive_absolute(log_dir)
+	if dir_error != OK:
+		return
+
+	var log_path := log_dir.path_join(LOG_FILE_NAME)
+	var file: FileAccess
+	if FileAccess.file_exists(log_path):
+		file = FileAccess.open(log_path, FileAccess.READ_WRITE)
+		if file != null:
+			file.seek_end()
+	else:
+		file = FileAccess.open(log_path, FileAccess.WRITE_READ)
+
+	if file == null:
+		return
+
+	var line := "%s [%s] %s" % [
+		Time.get_datetime_string_from_system(true),
+		level.to_upper(),
+		message
+	]
+	if not context.is_empty():
+		line += " " + JSON.stringify(context)
+	file.store_line(line)
+	file.close()
+

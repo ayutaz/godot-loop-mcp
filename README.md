@@ -12,15 +12,28 @@
 
 ## ステータス
 
-このリポジトリは立ち上げ初期段階です。
+このリポジトリは立ち上げ初期段階ですが、`M0` は完了しています。
 
-最初のターゲットは、Unity の uLoopMCP に着想を得た Godot 4.4+ 向けの構成です。
+現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
-- Scene / Script の editor-aware な観測
-- runtime error / log の取得
-- play / stop 制御
-- project / resource 検索
-- 段階的に安全性を管理した自動化機能
+- 実装済み: addon skeleton, TypeScript server skeleton, `handshake`, 双方向 `ping`, capability manifest, reconnect policy
+- 次の対象: `M1` の read-only observation tools/resources
+- 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
+
+## M0 Bootstrap
+
+M0 の bridge 実装は動作確認済みです。
+
+- 契約仕様: [docs/m0-bridge-contract.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m0-bridge-contract.md)
+- ローカル起動手順: [docs/m0-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m0-local-development.md)
+- マイルストーン: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
+
+確認済みの最小スモークテスト:
+
+```powershell
+npm --prefix packages/server run start
+godot_console.exe --headless --editor --quit-after 240 --path .
+```
 
 ## ライセンス
 
