@@ -26,18 +26,26 @@
 - `scripts/actions/package-addon.ps1`
 - `scripts/actions/write-sha256.ps1`
 - `packages/server/package-lock.json`
+- `docs/m5-local-development.md`
 
 現時点で残っている差分は次です。
 
 - `packages/server/package.json` はまだ `private: true`
 - npm trusted publisher の repository 側設定は未実施
 - `run_tests` 系 workflow と test report asset の CI 統合は未実装
+  - repo には `run_tests` adapter と `smoke:m4` があるが、Actions workflow にはまだ接続していない
 - `export_presets.cfg` は未作成
 - reusable workflow 化はまだ行っていない
 
 補足:
 
 このため、現行の CD は `GitHub Release asset 生成` までは自動化し、`npm publish` は explicit opt-in + repository variable 前提の dormant job として置いています。
+
+ローカル検証の source of truth:
+
+- `docs/m4-local-development.md`
+- `docs/m5-local-development.md`
+- `docs/m6-local-development.md`
 
 ## マルチエージェント統合結論
 

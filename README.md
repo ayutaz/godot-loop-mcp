@@ -12,7 +12,7 @@
 
 ## ステータス
 
-このリポジトリは立ち上げ初期段階ですが、`M0` から `M4` と `M6` は実装済みで、`M5` は release hardening を残して進行中です。
+このリポジトリでは `M0` から `M6` の実装面が揃っており、残作業は `M5` の release hardening と publishing 設定に集約されています。
 
 現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
@@ -135,11 +135,13 @@ npm --prefix packages/server run smoke:m4
 
 security enforcement と dangerous mode の最小実装は入っています。
 
+- 手順: [docs/m5-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m5-local-development.md)
 - 手順: [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)
 - security levels: `ReadOnly`, `WorkspaceWrite`, `Dangerous`
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: server/addon の `Dangerous` 指定に加え、write prefix / shell allowlist / editor script opt-in が必要
+- status: security enforcement と監査は実装済み。trusted publishing と release hardening は引き続き `M5` の残作業
 
 確認済みコマンド:
 

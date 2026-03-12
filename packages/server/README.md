@@ -58,5 +58,12 @@ On `Godot 4.5+`, `get_output_logs` / `get_godot_errors` prefer the addon-side ed
 Security and audit notes:
 
 - `GODOT_LOOP_MCP_SECURITY_LEVEL` controls the server-side maximum level
+- `GODOT_LOOP_MCP_ENABLE_EDITOR_SCRIPT`, `GODOT_LOOP_MCP_ALLOWED_WRITE_PREFIXES`, and `GODOT_LOOP_MCP_ALLOWED_SHELL_COMMANDS` are enforced by the addon for dangerous-mode tools
 - `.godot/mcp/audit.log` records tool/resource/prompt access with hashed arguments and duration
 - dangerous tools stay hidden unless both server and addon opt into `Dangerous`
+
+Relevant guides:
+
+- [docs/m4-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m4-local-development.md)
+- [docs/m5-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m5-local-development.md)
+- [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)

@@ -12,7 +12,7 @@ The project is intended to provide:
 
 ## Status
 
-This repository is still in the bootstrap phase, but `M0` through `M4` and `M6` are implemented, and `M5` remains in progress for release hardening.
+This repository now has the implementation surface for `M0` through `M6`, and the remaining work is concentrated in `M5` release hardening and publishing setup.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
@@ -135,11 +135,13 @@ npm --prefix packages/server run smoke:m4
 
 Security enforcement and the initial dangerous mode implementation are in place.
 
+- Guide: [docs/m5-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m5-local-development.md)
 - Guide: [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)
 - security levels: `ReadOnly`, `WorkspaceWrite`, `Dangerous`
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: both server and addon must opt into `Dangerous`, plus write prefixes / shell allowlists / editor script opt-in
+- status: security enforcement and audit are implemented. trusted publishing and release hardening remain the open `M5` tasks
 
 Verified commands:
 

@@ -38,7 +38,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 - 実行結果の logs/errors を再取得できる
 
 `M3` 以降は MVP 拡張として扱います。  
-2026-03-12 時点では `M4` と `M6` まで repo に反映済みで、`M5` は release hardening を残して進行中です。
+2026-03-12 時点では `M0` から `M6` の実装面が repo に反映済みで、`M5` は release hardening と publishing 設定を残して進行中です。
 
 ## 現在の実装状況
 
@@ -51,7 +51,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 | `M2` | 完了 | `WorkspaceWrite` manifest, scene/node/script write tools, `play_scene` / `stop_scene`, headless external runtime launch, `.godot/mcp/runtime.log`, `smoke:m2` を追加 |
 | `M3` | 完了 | `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, capability-aware dynamic tool/resource exposure, `smoke:m3` を追加 |
 | `M4` | 完了 | `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4` を追加 |
-| `M5` | 進行中 | security level enforcement, `.godot/mcp/audit.log`, 既存の GitHub Actions workflows, packaging scripts, Asset Library checklist を実装。trusted publishing と release hardening が残作業 |
+| `M5` | 進行中 | security level enforcement, `.godot/mcp/audit.log`, 既存の GitHub Actions workflows, packaging scripts, Asset Library checklist, `docs/m5-local-development.md` を実装。trusted publishing と release hardening が残作業 |
 | `M6` | 完了 | `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, `smoke:m6` を追加 |
 
 確認済みスモークテスト:
@@ -79,6 +79,9 @@ CI/CD 詳細計画:
 - `docs/m1-local-development.md`
 - `docs/m2-local-development.md`
 - `docs/m3-local-development.md`
+- `docs/m4-local-development.md`
+- `docs/m5-local-development.md`
+- `docs/m6-local-development.md`
 
 ## サマリー
 

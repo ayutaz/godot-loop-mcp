@@ -5,7 +5,7 @@
 ## 実装追記
 
 この文書は設計判断の調査記録です。  
-2026-03-12 時点で `M0: Foundation and Contracts` から `M4: Verification Loop Hardening` と `M6: Restricted Advanced Automation` までは repo に反映済みで、`M5` は release hardening を残して進行中です。
+2026-03-12 時点で `M0: Foundation and Contracts` から `M6: Restricted Advanced Automation` までの実装面は repo に反映済みで、`M5` は release hardening と publishing 設定を残して進行中です。
 
 - 現行の bridge 契約: `docs/m0-bridge-contract.md`
 - 現行のローカル起動手順: `docs/m0-local-development.md`
@@ -13,12 +13,13 @@
 - 現行の M2 編集/実行手順: `docs/m2-local-development.md`
 - 現行の M3 search/UID 手順: `docs/m3-local-development.md`
 - 現行の M4 verification 手順: `docs/m4-local-development.md`
+- 現行の M5 security/release 手順: `docs/m5-local-development.md`
 - 現行の M6 dangerous mode 手順: `docs/m6-local-development.md`
 - 現行の進行計画: `docs/implementation-milestones.md`
 - 現行の CI/CD 計画: `docs/github-actions-cicd-plan.md`
 
 実装済みの範囲は `Addon skeleton + TypeScript server skeleton + localhost TCP bridge + handshake + bidirectional ping + read/write observation surface + 4.5+ editor console capture + search/UID/dynamic catalog + tests/prompts/resource templates + security/audit + restricted dangerous mode + GitHub Actions CI/CD groundwork` です。  
-この調査文書より現行挙動の source of truth を優先する場合は、上記文書と実装コードを参照してください。2026-03-12 時点では `docs/m0-bridge-contract.md`, `docs/m1-local-development.md`, `docs/m2-local-development.md`, `docs/m3-local-development.md`, `docs/m4-local-development.md`, `docs/m6-local-development.md` を優先します。
+この調査文書より現行挙動の source of truth を優先する場合は、上記文書と実装コードを参照してください。2026-03-12 時点では `docs/m0-bridge-contract.md`, `docs/m1-local-development.md`, `docs/m2-local-development.md`, `docs/m3-local-development.md`, `docs/m4-local-development.md`, `docs/m5-local-development.md`, `docs/m6-local-development.md` を優先します。
 
 ## 結論
 

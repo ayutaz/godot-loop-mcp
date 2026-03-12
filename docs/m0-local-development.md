@@ -106,10 +106,15 @@ Editor の `Project > Tools` メニューに次を追加しています。
 M0 は bridge の足場だけを対象にします。
 
 - 実装済み: addon skeleton, TCP bridge, handshake, bidirectional ping, capability logging
-- 未着手: scene/script 読み書き, tests, screenshot, 任意コード実行
+- 後続マイルストーンへ分離済み: M1 read-only observation, M2 edit/play, M4 verification, M5 security/release, M6 dangerous automation
 
 ## 10. M1 以降の確認
 
-M1 の read-only observation は別手順に切り出しています。
+M1 以降の手順は別文書に切り出しています。
 
 - [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
+- [docs/m2-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m2-local-development.md)
+- [docs/m3-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m3-local-development.md)
+- [docs/m4-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m4-local-development.md)
+- [docs/m5-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m5-local-development.md)
+- [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)
