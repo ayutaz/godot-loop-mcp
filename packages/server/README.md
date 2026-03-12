@@ -61,6 +61,20 @@ $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm run smoke:m4
 ```
 
+For the M4 adapter-detection smoke:
+
+```powershell
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm run smoke:m4:adapters
+```
+
+For the M4 GUI screenshot / runtime-debug smoke:
+
+```powershell
+$env:GODOT_LOOP_MCP_GODOT_GUI_BIN = (Get-Command godot.exe).Source
+npm run smoke:m4:gui
+```
+
 For the M6 dangerous-mode smoke:
 
 ```powershell

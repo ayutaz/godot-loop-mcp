@@ -20,8 +20,8 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 - Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, reusable workflows, packaging scripts, and release assets
 - Implemented: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, and MCP tool error hardening
 - Implemented: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, and `smoke:m2`
-- Implemented: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, and `smoke:m3`
-- Implemented: `M4` `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, and `smoke:m4`
+- Implemented: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, stale UID registry fallback, and `smoke:m3`
+- Implemented: `M4` `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4`, `smoke:m4:adapters`, and `smoke:m4:gui`
 - Implemented: `M5` security level enforcement and `.godot/mcp/audit.log`
 - Implemented: `M6` `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, and `smoke:m6`
 - Implemented: capability-aware dynamic MCP tool/resource exposure; when no addon session is ready, only the fallback log surface remains visible

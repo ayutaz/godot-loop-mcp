@@ -47,6 +47,8 @@
     "smoke:m2": "node --experimental-strip-types src/dev/m2Smoke.ts",
     "smoke:m3": "node --experimental-strip-types src/dev/m3Smoke.ts",
     "smoke:m4": "node --experimental-strip-types src/dev/m4Smoke.ts",
+    "smoke:m4:adapters": "node --experimental-strip-types src/dev/m4AdaptersSmoke.ts",
+    "smoke:m4:gui": "node --experimental-strip-types src/dev/m4GuiSmoke.ts",
     "smoke:m6": "node --experimental-strip-types src/dev/m6Smoke.ts"
   },
   "dependencies": {

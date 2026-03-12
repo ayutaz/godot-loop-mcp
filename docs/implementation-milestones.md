@@ -49,8 +49,8 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 | `M0` | 完了 | Addon skeleton, TypeScript server skeleton, `bridge.handshake.hello`, `bridge.handshake.sync`, 双方向 `bridge.ping`, capability logging, reconnect policy, quick reference を本書へ統合 |
 | `M1` | 完了 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。addon 側 error は MCP tool error に反映。smoke は legacy `addon-staging` を退避して UID duplicate warning を回避。`Godot 4.5+` では `OS.add_logger()` 由来の editor console capture、`4.4` では `.godot/mcp` fallback を返す |
 | `M2` | 完了 | `WorkspaceWrite` manifest, scene/node/script write tools, `play_scene` / `stop_scene`, headless external runtime launch, `.godot/mcp/runtime.log`, `smoke:m2` を追加 |
-| `M3` | 完了 | `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, capability-aware dynamic tool/resource exposure, `smoke:m3` を追加 |
-| `M4` | 完了 | `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4` を追加 |
+| `M3` | 完了 | `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, capability-aware dynamic tool/resource exposure, stale UID registry fallback, `smoke:m3` を追加 |
+| `M4` | 完了 | `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4`, `smoke:m4:adapters`, `smoke:m4:gui` を追加 |
 | `M5` | 外部設定待ち | security level enforcement, `.godot/mcp/audit.log`, reusable GitHub Actions workflows, `verification-smoke`, release `test-reports` asset, publishable `packages/server`, Asset Library checklist を実装。残るのは npm trusted publisher の npm 側登録 |
 | `M6` | 完了 | `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, `smoke:m6` を追加 |
 

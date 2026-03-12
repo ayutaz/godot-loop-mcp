@@ -39,6 +39,15 @@ func get_runtime_state() -> Dictionary:
 		_runtime_pid = -1
 		_runtime_scene_path = ""
 
+	var editor_playing_scene := str(_editor_interface.get_playing_scene()).strip_edges()
+	if editor_playing_scene != "":
+		return {
+			"isPlayingScene": true,
+			"playingScenePath": editor_playing_scene,
+			"runtimeLogPath": "",
+			"runtimeMode": "editor-play"
+		}
+
 	return {
 		"isPlayingScene": _runtime_pid > 0,
 		"playingScenePath": _runtime_scene_path,

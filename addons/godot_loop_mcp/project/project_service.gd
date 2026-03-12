@@ -27,6 +27,13 @@ const TEXT_SEARCHABLE_EXTENSIONS := {
 const TEXT_SEARCH_MAX_FILE_BYTES := 1_048_576
 const MAX_SEARCH_RESULTS := 200
 const MAX_RESAVE_PATHS := 100
+const UID_SCAN_SKIPPED_EXTENSIONS := {
+	"import": true,
+	"log": true,
+	"md": true,
+	"tmp": true,
+	"uid": true
+}
 
 var _editor_interface: EditorInterface
 var _workspace_root := ""
@@ -133,6 +140,9 @@ func _get_uid(params: Dictionary) -> Dictionary:
 
 	var resource_path := str(path_result.get("path", ""))
 	var uid_info := _describe_uid(resource_path)
+	if bool(uid_info.get("hasUid", false)) and str(uid_info.get("resolvedPath", "")) == "":
+		_rescan_filesystem(_editor_interface.get_resource_filesystem())
+		uid_info = _describe_uid(resource_path)
 	return _ok(
 		{
 			"path": resource_path,
@@ -157,16 +167,10 @@ func _resolve_uid(params: Dictionary) -> Dictionary:
 	if requested_uid == "" and requested_uid_id != ResourceUID.INVALID_ID:
 		requested_uid = str(ResourceUID.id_to_text(requested_uid_id))
 
-	var resolved_path := ""
-	var found := false
-	if requested_uid_id != ResourceUID.INVALID_ID and ResourceUID.has_id(requested_uid_id):
-		resolved_path = str(ResourceUID.get_id_path(requested_uid_id))
-		found = resolved_path != ""
-	elif requested_uid != "":
-		resolved_path = str(ResourceUID.uid_to_path(requested_uid))
-		found = resolved_path != ""
-		if found:
-			requested_uid_id = int(ResourceUID.text_to_id(requested_uid))
+	var resolved_path := _resolve_uid_path(requested_uid, requested_uid_id)
+	var found := resolved_path != ""
+	if found and requested_uid_id == ResourceUID.INVALID_ID and requested_uid != "":
+		requested_uid_id = int(ResourceUID.text_to_id(requested_uid))
 
 	return _ok(
 		{
@@ -642,6 +646,66 @@ func _describe_uid(resource_path: String) -> Dictionary:
 		"uidId": uid_id,
 		"resolvedPath": str(ResourceUID.get_id_path(uid_id)) if has_uid and ResourceUID.has_id(uid_id) else ""
 	}
+
+
+func _resolve_uid_path(requested_uid: String, requested_uid_id: int) -> String:
+	var resolved_path := _resolve_uid_path_from_registry(requested_uid_id)
+	if resolved_path != "":
+		return resolved_path
+
+	var filesystem := _editor_interface.get_resource_filesystem()
+	_rescan_filesystem(filesystem)
+	resolved_path = _resolve_uid_path_from_registry(requested_uid_id)
+	if resolved_path != "":
+		return resolved_path
+
+	if requested_uid == "":
+		return ""
+	return _scan_workspace_for_uid("res://", requested_uid)
+
+
+func _resolve_uid_path_from_registry(requested_uid_id: int) -> String:
+	if requested_uid_id == ResourceUID.INVALID_ID:
+		return ""
+	if not ResourceUID.has_id(requested_uid_id):
+		return ""
+	return str(ResourceUID.get_id_path(requested_uid_id))
+
+
+func _scan_workspace_for_uid(resource_dir_path: String, requested_uid: String) -> String:
+	var absolute_dir_path := ProjectSettings.globalize_path(resource_dir_path)
+	var directory := DirAccess.open(absolute_dir_path)
+	if directory == null:
+		return ""
+
+	directory.list_dir_begin()
+	var entry_name := directory.get_next()
+	while entry_name != "":
+		if entry_name in [".", ".."]:
+			entry_name = directory.get_next()
+			continue
+
+		var candidate_path := resource_dir_path.path_join(entry_name)
+		if directory.current_is_dir():
+			if not _should_skip_search_directory(entry_name):
+				var resolved_path := _scan_workspace_for_uid(candidate_path, requested_uid)
+				if resolved_path != "":
+					directory.list_dir_end()
+					return resolved_path
+		elif not _should_skip_uid_scan_file(candidate_path):
+			if str(ResourceUID.path_to_uid(candidate_path)) == requested_uid:
+				directory.list_dir_end()
+				return candidate_path
+
+		entry_name = directory.get_next()
+
+	directory.list_dir_end()
+	return ""
+
+
+func _should_skip_uid_scan_file(resource_path: String) -> bool:
+	var extension := resource_path.get_extension().to_lower()
+	return UID_SCAN_SKIPPED_EXTENSIONS.has(extension)
 
 
 func _infer_kind(resource_path: String, resource_type: String) -> String:

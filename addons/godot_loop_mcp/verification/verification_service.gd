@@ -224,23 +224,24 @@ func _resolve_executable_path(raw_command: String) -> String:
 
 func _parse_test_output(output_text: String) -> Dictionary:
 	var trimmed := output_text.strip_edges()
-	var parsed_json := JSON.parse_string(trimmed)
-	if typeof(parsed_json) == TYPE_DICTIONARY:
-		var parsed_dict: Dictionary = parsed_json
-		if parsed_dict.has("summary"):
+	if trimmed.begins_with("{"):
+		var parsed_json := JSON.parse_string(trimmed)
+		if typeof(parsed_json) == TYPE_DICTIONARY:
+			var parsed_dict: Dictionary = parsed_json
+			if parsed_dict.has("summary"):
+				return {
+					"summary": parsed_dict.get("summary", {}),
+					"parsed": parsed_dict
+				}
 			return {
-				"summary": parsed_dict.get("summary", {}),
+				"summary": {
+					"passed": int(parsed_dict.get("passed", 0)),
+					"failed": int(parsed_dict.get("failed", 0)),
+					"skipped": int(parsed_dict.get("skipped", 0)),
+					"total": int(parsed_dict.get("total", 0))
+				},
 				"parsed": parsed_dict
 			}
-		return {
-			"summary": {
-				"passed": int(parsed_dict.get("passed", 0)),
-				"failed": int(parsed_dict.get("failed", 0)),
-				"skipped": int(parsed_dict.get("skipped", 0)),
-				"total": int(parsed_dict.get("total", 0))
-			},
-			"parsed": parsed_dict
-		}
 
 	var summary := {
 		"passed": _extract_int_after_label(output_text, "passed"),

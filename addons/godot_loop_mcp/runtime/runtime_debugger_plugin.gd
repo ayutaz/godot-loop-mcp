@@ -10,11 +10,8 @@ func _init(capture_store) -> void:
 	_capture_store = capture_store
 
 
-func _has_capture(prefixes) -> bool:
-	for prefix in prefixes:
-		if str(prefix) == MESSAGE_PREFIX:
-			return true
-	return false
+func _has_capture(capture: String) -> bool:
+	return capture == MESSAGE_PREFIX
 
 
 func _capture(message: String, data: Array, session_id: int) -> bool:

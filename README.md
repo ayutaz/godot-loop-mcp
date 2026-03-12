@@ -20,8 +20,8 @@
 - 実装済み: GitHub Actions `ci`, `nightly-compat`, `release`, reusable workflows, packaging scripts, release asset 生成
 - 実装済み: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, MCP tool error hardening
 - 実装済み: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, `smoke:m2`
-- 実装済み: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, `smoke:m3`
-- 実装済み: `M4` `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4`
+- 実装済み: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, stale UID registry fallback, `smoke:m3`
+- 実装済み: `M4` `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4`, `smoke:m4:adapters`, `smoke:m4:gui`
 - 実装済み: `M5` security level enforcement と `.godot/mcp/audit.log`
 - 実装済み: `M6` `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, `smoke:m6`
 - 実装済み: active addon session の capability manifest に応じて MCP tools/resources を動的公開し、未接続時は fallback log surface のみを露出
