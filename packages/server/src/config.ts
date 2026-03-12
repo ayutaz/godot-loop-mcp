@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { SecurityLevel } from "./transport/types.ts";
 
 export interface ServerConfig {
   host: string;
@@ -14,6 +15,7 @@ export interface ServerConfig {
   repoRoot: string;
   logDir: string;
   bridgeOnlyMode: boolean;
+  securityLevel: SecurityLevel;
 }
 
 const sourceDir = fileURLToPath(new URL(".", import.meta.url));
@@ -33,7 +35,8 @@ export function loadConfig(): ServerConfig {
     reconnectMaxDelayMs: numberFromEnv("GODOT_LOOP_MCP_RECONNECT_MAX_DELAY_MS", 10_000),
     repoRoot,
     logDir: process.env.GODOT_LOOP_MCP_LOG_DIR ?? path.join(repoRoot, ".godot", "mcp"),
-    bridgeOnlyMode: booleanFromEnv("GODOT_LOOP_MCP_BRIDGE_ONLY", false)
+    bridgeOnlyMode: booleanFromEnv("GODOT_LOOP_MCP_BRIDGE_ONLY", false),
+    securityLevel: securityLevelFromEnv("GODOT_LOOP_MCP_SECURITY_LEVEL", "WorkspaceWrite")
   };
 }
 
@@ -54,4 +57,18 @@ function booleanFromEnv(name: string, fallback: boolean): boolean {
   }
 
   return rawValue === "1" || rawValue.toLowerCase() === "true";
+}
+
+function securityLevelFromEnv(name: string, fallback: SecurityLevel): SecurityLevel {
+  const rawValue = process.env[name]?.trim().toLowerCase();
+  switch (rawValue) {
+    case "readonly":
+      return "ReadOnly";
+    case "dangerous":
+      return "Dangerous";
+    case "workspacewrite":
+      return "WorkspaceWrite";
+    default:
+      return fallback;
+  }
 }

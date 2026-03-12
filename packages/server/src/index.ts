@@ -52,7 +52,8 @@ server.listen(config.port, config.host, () => {
     port: config.port,
     logDir: config.logDir,
     bridgeOnlyMode: config.bridgeOnlyMode,
-    mcpCatalog: buildMcpCatalog()
+    securityLevel: config.securityLevel,
+    mcpCatalog: buildMcpCatalog({ securityLevel: config.securityLevel })
   });
   if (mcpServer) {
     void mcpServer.connectStdio().catch((error) => {

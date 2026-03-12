@@ -31,7 +31,7 @@
 
 - `packages/server/package.json` はまだ `private: true`
 - npm trusted publisher の repository 側設定は未実施
-- `run_tests` 系 workflow と test report asset は未実装
+- `run_tests` 系 workflow と test report asset の CI 統合は未実装
 - `export_presets.cfg` は未作成
 - reusable workflow 化はまだ行っていない
 
@@ -215,7 +215,8 @@ PR で回す job:
 
 開始条件:
 
-- `run_tests` adapter と screenshot capability の有無判定が入る
+- `run_tests` adapter と screenshot capability の有無判定は repo 実装済み
+- CI workflow へ組み込む段階に入る
 
 追加 job:
 
@@ -252,7 +253,7 @@ GitHub Release に添付する成果物:
 
 補足:
 
-`test-reports-vX.Y.Z.zip` は `run_tests` adapter 導入後に追加します。
+`test-reports-vX.Y.Z.zip` は CI workflow に `run_tests` job を組み込んだ時点で追加します。
 
 ### Addon packaging
 

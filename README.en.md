@@ -12,7 +12,7 @@ The project is intended to provide:
 
 ## Status
 
-This repository is still in the bootstrap phase, but `M0` through `M3` are complete and `M5` CI/CD groundwork is in progress.
+This repository is still in the bootstrap phase, but `M0` through `M4` and `M6` are implemented, and `M5` remains in progress for release hardening.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
@@ -21,9 +21,12 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 - Implemented: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, and MCP tool error hardening
 - Implemented: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, and `smoke:m2`
 - Implemented: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, and `smoke:m3`
+- Implemented: `M4` `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, and `smoke:m4`
+- Implemented: `M5` security level enforcement and `.godot/mcp/audit.log`
+- Implemented: `M6` `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, and `smoke:m6`
 - Implemented: capability-aware dynamic MCP tool/resource exposure; when no addon session is ready, only the fallback log surface remains visible
 - Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, headless play output via `.godot/mcp/runtime.log`, and `.godot/mcp` fallback on `4.4`
-- Next target: `M4` tests / screenshot / telemetry
+- In progress: deeper GitHub Actions integration for `run_tests`, report artifacts, release hardening, and trusted publishing setup
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -108,6 +111,42 @@ Verified commands:
 npm --prefix packages/server run typecheck
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm --prefix packages/server run smoke:m3
+```
+
+## M4 Verification
+
+The M4 verification loop hardening is implemented.
+
+- Guide: [docs/m4-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m4-local-development.md)
+- tools: `run_tests`, `get_editor_screenshot`, `get_running_scene_screenshot`, `get_runtime_debug_events`, `clear_runtime_debug_events`
+- prompts: `godot_editor_strategy`, `godot_ui_layout_strategy`, `godot_debug_loop`, `godot_scene_edit_safety`
+- resource templates: `godot://scene/{path}`, `godot://script/{path}`, `godot://node/{scenePath}/{nodePath}`, `godot://resource/{uid}`
+- note: screenshot is only enabled in a GUI editor session. `runtime.debug` also requires the `runtime_telemetry.gd` autoload to be registered, and both stay hidden in headless mode
+
+Verified commands:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m4
+```
+
+## M5/M6 Security
+
+Security enforcement and the initial dangerous mode implementation are in place.
+
+- Guide: [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)
+- security levels: `ReadOnly`, `WorkspaceWrite`, `Dangerous`
+- audit: `.godot/mcp/audit.log`
+- dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
+- gating: both server and addon must opt into `Dangerous`, plus write prefixes / shell allowlists / editor script opt-in
+
+Verified commands:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m6
 ```
 
 ## License

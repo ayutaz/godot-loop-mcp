@@ -37,6 +37,26 @@ $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm run smoke:m3
 ```
 
-The MCP tool/resource catalog is now capability-aware. Before the addon session becomes ready, the server only exposes the fallback log surface. After handshake, it enables tools/resources according to the addon capability manifest and emits list-changed notifications through the SDK.
+For the M4 verification / prompts / template smoke:
+
+```powershell
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm run smoke:m4
+```
+
+For the M6 dangerous-mode smoke:
+
+```powershell
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm run smoke:m6
+```
+
+The MCP catalog is capability-aware and security-aware. Before the addon session becomes ready, the server only exposes the fallback log surface. After handshake, it enables tools/resources/prompts/resource templates according to the addon capability manifest and the effective security level, and emits list-changed notifications through the SDK.
 
 On `Godot 4.5+`, `get_output_logs` / `get_godot_errors` prefer the addon-side editor console ring buffer via `OS.add_logger()`. In headless `play_scene`, the addon launches an external runtime and returns `runtime-log-file` entries from `.godot/mcp/runtime.log` once output is available. On `Godot 4.4`, the server falls back to `.godot/mcp` addon/server logs when editor/runtime capture is unavailable.
+
+Security and audit notes:
+
+- `GODOT_LOOP_MCP_SECURITY_LEVEL` controls the server-side maximum level
+- `.godot/mcp/audit.log` records tool/resource/prompt access with hashed arguments and duration
+- dangerous tools stay hidden unless both server and addon opt into `Dangerous`

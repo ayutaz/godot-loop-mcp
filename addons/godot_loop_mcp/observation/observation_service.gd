@@ -1,6 +1,7 @@
 @tool
 extends RefCounted
 
+const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
 const EditorConsoleCapture = preload("res://addons/godot_loop_mcp/observation/editor_console_capture.gd")
 const ADDON_LOG_PATH := "res://.godot/mcp/addon.log"
 const RUNTIME_LOG_PATH := "res://.godot/mcp/runtime.log"
@@ -71,6 +72,8 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 		"godot.logs.get_errors":
 			return _get_error_logs(request_params)
 		"godot.logs.clear":
+			if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
+				return _error(-32010, "clear_output_logs requires WorkspaceWrite security.")
 			return _clear_output_logs()
 		_:
 			return {"handled": false}

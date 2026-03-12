@@ -3,8 +3,13 @@ extends EditorPlugin
 
 const BridgeClient = preload("res://addons/godot_loop_mcp/bridge/bridge_client.gd")
 const CapabilityRegistry = preload("res://addons/godot_loop_mcp/capabilities/capability_registry.gd")
+const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
+const DangerousService = preload("res://addons/godot_loop_mcp/dangerous/dangerous_service.gd")
 const ObservationService = preload("res://addons/godot_loop_mcp/observation/observation_service.gd")
 const ProjectService = preload("res://addons/godot_loop_mcp/project/project_service.gd")
+const RuntimeDebugCapture = preload("res://addons/godot_loop_mcp/runtime/runtime_debug_capture.gd")
+const RuntimeDebuggerPlugin = preload("res://addons/godot_loop_mcp/runtime/runtime_debugger_plugin.gd")
+const VerificationService = preload("res://addons/godot_loop_mcp/verification/verification_service.gd")
 const WorkspaceService = preload("res://addons/godot_loop_mcp/workspace/workspace_service.gd")
 
 const SETTING_BRIDGE_HOST := "godot_loop_mcp/bridge/host"
@@ -25,6 +30,10 @@ var _capability_registry: RefCounted
 var _observation_service: RefCounted
 var _project_service: RefCounted
 var _workspace_service: RefCounted
+var _verification_service: RefCounted
+var _dangerous_service: RefCounted
+var _runtime_debug_capture: RefCounted
+var _runtime_debugger_plugin
 var _current_state := "disconnected"
 
 
@@ -47,10 +56,15 @@ func _exit_tree() -> void:
 	_dispose_observation_service()
 	_dispose_project_service()
 	_dispose_workspace_service()
+	_dispose_verification_service()
+	_dispose_dangerous_service()
+	_unregister_runtime_debugger_plugin()
 	_bridge_client = null
 	_capability_registry = null
 	_observation_service = null
 	_project_service = null
+	_verification_service = null
+	_dangerous_service = null
 
 
 func _process(delta: float) -> void:
@@ -74,11 +88,22 @@ func _start_bridge() -> void:
 	_dispose_observation_service()
 	_dispose_project_service()
 	_dispose_workspace_service()
+	_dispose_verification_service()
+	_dispose_dangerous_service()
+	_register_runtime_debugger_plugin()
 	_observation_service = ObservationService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
 	_project_service = ProjectService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
 	_workspace_service = WorkspaceService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
+	_verification_service = VerificationService.new(
+		get_editor_interface(),
+		ProjectSettings.globalize_path("res://"),
+		_runtime_debug_capture
+	)
+	_dangerous_service = DangerousService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
 	if _observation_service != null and _observation_service.has_method("set_runtime_state_provider"):
 		_observation_service.set_runtime_state_provider(Callable(_workspace_service, "get_runtime_state"))
+	if _verification_service != null and _verification_service.has_method("set_runtime_state_provider"):
+		_verification_service.set_runtime_state_provider(Callable(_workspace_service, "get_runtime_state"))
 	_capability_registry = CapabilityRegistry.new()
 	_append_log("info", "Observation capabilities updated.", _observation_service.get_console_capture_status())
 	_bridge_client = BridgeClient.new(
@@ -126,6 +151,18 @@ func _dispose_workspace_service() -> void:
 	_workspace_service = null
 
 
+func _dispose_verification_service() -> void:
+	if _verification_service == null:
+		return
+	_verification_service = null
+
+
+func _dispose_dangerous_service() -> void:
+	if _dangerous_service == null:
+		return
+	_dangerous_service = null
+
+
 func _handle_bridge_request(method: String, params: Variant = {}) -> Dictionary:
 	if _observation_service != null:
 		var observation_result: Dictionary = _observation_service.handle_request(method, params)
@@ -138,7 +175,17 @@ func _handle_bridge_request(method: String, params: Variant = {}) -> Dictionary:
 			return project_result
 
 	if _workspace_service != null:
-		return _workspace_service.handle_request(method, params)
+		var workspace_result: Dictionary = _workspace_service.handle_request(method, params)
+		if typeof(workspace_result) == TYPE_DICTIONARY and bool(workspace_result.get("handled", false)):
+			return workspace_result
+
+	if _verification_service != null:
+		var verification_result: Dictionary = _verification_service.handle_request(method, params)
+		if typeof(verification_result) == TYPE_DICTIONARY and bool(verification_result.get("handled", false)):
+			return verification_result
+
+	if _dangerous_service != null:
+		return _dangerous_service.handle_request(method, params)
 
 	return {"handled": false}
 
@@ -198,6 +245,12 @@ func _build_capability_overrides() -> Dictionary:
 		overrides.merge(_observation_service.get_capability_overrides(), true)
 	if _project_service != null and _project_service.has_method("get_capability_overrides"):
 		overrides.merge(_project_service.get_capability_overrides(), true)
+	if _verification_service != null and _verification_service.has_method("get_capability_overrides"):
+		overrides.merge(_verification_service.get_capability_overrides(), true)
+	if _dangerous_service != null and _dangerous_service.has_method("get_capability_overrides"):
+		overrides.merge(_dangerous_service.get_capability_overrides(), true)
+	if _runtime_debug_capture != null and _runtime_debug_capture.has_method("get_capability_overrides"):
+		overrides.merge(_runtime_debug_capture.get_capability_overrides(), true)
 	if not overrides.has("editor.console.capture"):
 		overrides["editor.console.capture"] = "disabled"
 	return overrides
@@ -222,6 +275,44 @@ func _register_project_settings() -> void:
 		TYPE_INT,
 		PROPERTY_HINT_RANGE,
 		"1000,120000,100"
+	)
+	_register_project_setting(
+		PluginSettings.SETTING_SECURITY_LEVEL,
+		PluginSettings.DEFAULT_SECURITY_LEVEL,
+		TYPE_STRING,
+		PROPERTY_HINT_ENUM,
+		"ReadOnly,WorkspaceWrite,Dangerous"
+	)
+	_register_project_setting(
+		PluginSettings.SETTING_TESTS_ADAPTER,
+		"Auto",
+		TYPE_STRING,
+		PROPERTY_HINT_ENUM,
+		"Auto,Custom,GdUnit4,GUT"
+	)
+	_register_project_setting(PluginSettings.SETTING_TESTS_CUSTOM_COMMAND, "", TYPE_STRING, PROPERTY_HINT_NONE, "")
+	_register_project_setting(PluginSettings.SETTING_TESTS_CUSTOM_ARGS_JSON, "[]", TYPE_STRING, PROPERTY_HINT_NONE, "")
+	_register_project_setting(PluginSettings.SETTING_TESTS_DEFAULT_DIR, "res://test", TYPE_STRING, PROPERTY_HINT_NONE, "")
+	_register_project_setting(
+		PluginSettings.SETTING_DANGEROUS_ENABLE_EDITOR_SCRIPT,
+		false,
+		TYPE_BOOL,
+		PROPERTY_HINT_NONE,
+		""
+	)
+	_register_project_setting(
+		PluginSettings.SETTING_DANGEROUS_ALLOWED_WRITE_PREFIXES,
+		PackedStringArray(),
+		TYPE_PACKED_STRING_ARRAY,
+		PROPERTY_HINT_NONE,
+		""
+	)
+	_register_project_setting(
+		PluginSettings.SETTING_DANGEROUS_ALLOWED_SHELL_COMMANDS,
+		PackedStringArray(),
+		TYPE_PACKED_STRING_ARRAY,
+		PROPERTY_HINT_NONE,
+		""
 	)
 
 
@@ -256,6 +347,22 @@ func _format_godot_version() -> String:
 
 func _get_project_name() -> String:
 	return str(ProjectSettings.get_setting("application/config/name", "godot-loop-mcp"))
+
+
+func _register_runtime_debugger_plugin() -> void:
+	if _runtime_debugger_plugin != null:
+		return
+	_runtime_debug_capture = RuntimeDebugCapture.new()
+	_runtime_debugger_plugin = RuntimeDebuggerPlugin.new(_runtime_debug_capture)
+	add_debugger_plugin(_runtime_debugger_plugin)
+
+
+func _unregister_runtime_debugger_plugin() -> void:
+	if _runtime_debugger_plugin == null:
+		return
+	remove_debugger_plugin(_runtime_debugger_plugin)
+	_runtime_debugger_plugin = null
+	_runtime_debug_capture = null
 
 
 func _append_log(level: String, message: String, context: Dictionary = {}) -> void:

@@ -1,6 +1,7 @@
 @tool
 extends RefCounted
 
+const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
 const SCENE_EXTENSION := "tscn"
 const SCRIPT_EXTENSION := "gd"
 const DEFAULT_SCENE_ROOT_TYPE := "Node2D"
@@ -50,6 +51,9 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 	var request_params := {}
 	if typeof(params) == TYPE_DICTIONARY:
 		request_params = params
+
+	if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
+		return _error(-32010, "%s requires WorkspaceWrite security." % method)
 
 	match method:
 		"godot.scene.create":

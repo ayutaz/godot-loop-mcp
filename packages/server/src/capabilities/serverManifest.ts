@@ -8,12 +8,11 @@ import type {
 
 export const PROTOCOL_VERSION = "0.1.0";
 export const SERVER_VERSION = "0.1.0";
-export const SERVER_SECURITY_LEVEL: SecurityLevel = "WorkspaceWrite";
 
-export function buildServerCapabilityManifest(): CapabilityManifest {
+export function buildServerCapabilityManifest(securityLevel: SecurityLevel): CapabilityManifest {
   return {
     schemaVersion: PROTOCOL_VERSION,
-    securityLevel: SERVER_SECURITY_LEVEL,
+    securityLevel,
     capabilities: [
       {
         id: "bridge.handshake",
@@ -38,6 +37,12 @@ export function buildServerCapabilityManifest(): CapabilityManifest {
         surface: "resource",
         availability: "enabled",
         description: "Core Godot resources are exposed dynamically for the current editor workspace."
+      },
+      {
+        id: "mcp.prompts",
+        surface: "resource",
+        availability: "enabled",
+        description: "User-controlled prompts and resource templates are exposed when addon capabilities allow them."
       }
     ]
   };
@@ -48,6 +53,7 @@ export function buildServerHello(input: {
   repoRoot: string;
   heartbeatIntervalMs: number;
   reconnectPolicy: ReconnectPolicy;
+  securityLevel: SecurityLevel;
   addonCapabilities?: CapabilityManifest;
 }): PeerHelloPayload {
   const capabilityLookup = createCapabilityLookup(input.addonCapabilities);
@@ -59,14 +65,14 @@ export function buildServerHello(input: {
       name: "godot-loop-mcp-server",
       version: SERVER_VERSION
     },
-    securityLevel: SERVER_SECURITY_LEVEL,
-    capabilities: buildServerCapabilityManifest(),
+    securityLevel: input.securityLevel,
+    capabilities: buildServerCapabilityManifest(input.securityLevel),
     workspaceRoot: input.repoRoot,
     reconnectPolicy: input.reconnectPolicy,
     bridge: {
       heartbeatIntervalMs: input.heartbeatIntervalMs
     },
-    mcp: buildMcpCatalog({ capabilities: capabilityLookup })
+    mcp: buildMcpCatalog({ capabilities: capabilityLookup, securityLevel: input.securityLevel })
   };
 }
 

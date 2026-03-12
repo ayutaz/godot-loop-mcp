@@ -20,7 +20,8 @@ import type {
   HandshakeSyncParams,
   PeerHelloPayload,
   PingParams,
-  PingResult
+  PingResult,
+  SecurityLevel
 } from "./types.ts";
 
 interface PendingRequest {
@@ -99,6 +100,19 @@ export class AddonSession {
     return manifest.some(
       (capability) => capability.id === capabilityId && capability.availability === "enabled"
     );
+  }
+
+  getSecurityLevel(): SecurityLevel {
+    return this.addonHello?.securityLevel ?? "ReadOnly";
+  }
+
+  getAddonProduct():
+    | {
+        name: string;
+        version: string;
+      }
+    | undefined {
+    return this.addonHello?.product;
   }
 
   request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
@@ -206,6 +220,7 @@ export class AddonSession {
       repoRoot: this.config.repoRoot,
       heartbeatIntervalMs: this.config.heartbeatIntervalMs,
       reconnectPolicy,
+      securityLevel: this.config.securityLevel,
       addonCapabilities: this.addonHello.capabilities
     });
 

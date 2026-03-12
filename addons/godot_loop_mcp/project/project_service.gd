@@ -1,6 +1,7 @@
 @tool
 extends RefCounted
 
+const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
 const TEXT_SEARCHABLE_EXTENSIONS := {
 	"cfg": true,
 	"cs": true,
@@ -62,13 +63,25 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 		"godot.resource.resolve_uid":
 			return _resolve_uid(request_params)
 		"godot.resource.resave":
+			if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
+				return _error(-32010, "resave_resources requires WorkspaceWrite security.")
 			return _resave_resources(request_params)
 		"godot.editor.get_selection":
 			return _ok(_build_selection_payload())
 		"godot.editor.set_selection":
+			if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
+				return _error(-32010, "set_selection requires WorkspaceWrite security.")
 			return _set_selection(request_params)
 		"godot.editor.focus_node":
+			if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
+				return _error(-32010, "focus_node requires WorkspaceWrite security.")
 			return _focus_node(request_params)
+		"godot.scene.inspect_file":
+			return _inspect_scene_file(request_params)
+		"godot.scene.inspect_node_file":
+			return _inspect_scene_node_file(request_params)
+		"godot.script.read_file":
+			return _read_script_file(request_params)
 		_:
 			return {"handled": false}
 
@@ -324,6 +337,82 @@ func _focus_node(params: Dictionary) -> Dictionary:
 			"currentScenePath": _get_current_scene_path(),
 			"focusedNode": _build_node_payload(focused_node),
 			"selection": _build_selection_payload()
+		}
+	)
+
+
+func _inspect_scene_file(params: Dictionary) -> Dictionary:
+	var path_result := _require_existing_resource_path(params, "path")
+	if not bool(path_result.get("ok", false)):
+		return path_result.get("error", _error(-32602, "path is required."))
+
+	var scene_path := str(path_result.get("path", ""))
+	var scene_resource := ResourceLoader.load(scene_path)
+	if not scene_resource is PackedScene:
+		return _error(-32004, "path did not resolve to a PackedScene.", {"path": scene_path})
+
+	var instance: Node = scene_resource.instantiate()
+	if instance == null:
+		return _error(-32010, "Failed to instantiate the scene resource.", {"path": scene_path})
+
+	var max_depth := int(params.get("maxDepth", -1))
+	var payload := {
+		"scenePath": scene_path,
+		"root": _serialize_node(instance, max_depth, 0)
+	}
+	instance.free()
+	return _ok(payload)
+
+
+func _inspect_scene_node_file(params: Dictionary) -> Dictionary:
+	var path_result := _require_existing_resource_path(params, "scenePath")
+	if not bool(path_result.get("ok", false)):
+		return path_result.get("error", _error(-32602, "scenePath is required."))
+
+	var node_path := str(params.get("nodePath", "")).strip_edges()
+	if node_path == "":
+		return _error(-32602, "nodePath is required.")
+
+	var scene_path := str(path_result.get("path", ""))
+	var scene_resource := ResourceLoader.load(scene_path)
+	if not scene_resource is PackedScene:
+		return _error(-32004, "scenePath did not resolve to a PackedScene.", {"scenePath": scene_path})
+
+	var instance: Node = scene_resource.instantiate()
+	if instance == null:
+		return _error(-32010, "Failed to instantiate the scene resource.", {"scenePath": scene_path})
+
+	var resolved_node := _find_node_by_reported_path(instance, node_path)
+	if resolved_node == null:
+		instance.free()
+		return _error(-32004, "nodePath could not be resolved inside the scene.", {"nodePath": node_path})
+
+	var payload := {
+		"scenePath": scene_path,
+		"nodePath": node_path,
+		"node": _serialize_node(resolved_node, int(params.get("maxDepth", 1)), 0)
+	}
+	instance.free()
+	return _ok(payload)
+
+
+func _read_script_file(params: Dictionary) -> Dictionary:
+	var path_result := _require_existing_resource_path(params, "path")
+	if not bool(path_result.get("ok", false)):
+		return path_result.get("error", _error(-32602, "path is required."))
+
+	var script_path := str(path_result.get("path", ""))
+	var file := FileAccess.open(ProjectSettings.globalize_path(script_path), FileAccess.READ)
+	if file == null:
+		return _error(-32010, "Failed to open the script file.", {"path": script_path})
+
+	var source := file.get_as_text()
+	file.close()
+	return _ok(
+		{
+			"path": script_path,
+			"lineCount": source.count("\n") + 1 if source != "" else 0,
+			"source": source
 		}
 	)
 
@@ -627,7 +716,14 @@ func _normalize_optional_resource_path(raw_path: String) -> String:
 func _find_node_by_reported_path(current: Node, reported_path: String) -> Node:
 	if reported_path == "":
 		return current
-	if str(current.get_path()) == reported_path or current.name == reported_path or reported_path == ".":
+
+	var current_paths: Array[String] = [current.name]
+	if current.is_inside_tree():
+		current_paths.append(str(current.get_path()))
+	else:
+		current_paths.append("/%s" % current.name)
+		current_paths.append(".")
+	if reported_path in current_paths or reported_path == ".":
 		return current
 
 	for child in current.get_children():
@@ -647,11 +743,30 @@ func _build_node_payload(node: Node) -> Dictionary:
 	return {
 		"name": node.name,
 		"type": node.get_class(),
-		"path": str(node.get_path()),
-		"parentPath": str(node.get_parent().get_path()) if node.get_parent() != null else "",
+		"path": str(node.get_path()) if node.is_inside_tree() else "/%s" % node.name,
+		"parentPath": (
+			str(node.get_parent().get_path())
+			if node.get_parent() != null and node.get_parent().is_inside_tree()
+			else "/%s" % node.get_parent().name if node.get_parent() != null else ""
+		),
 		"scriptPath": script_path,
 		"childCount": node.get_child_count()
 	}
+
+
+func _serialize_node(node: Node, max_depth: int, depth: int) -> Dictionary:
+	var payload := _build_node_payload(node)
+	payload["ownerPath"] = str(node.owner.get_path()) if node.owner != null else ""
+	if max_depth >= 0 and depth >= max_depth:
+		payload["children"] = []
+		return payload
+
+	var children: Array[Dictionary] = []
+	for child in node.get_children():
+		if child is Node:
+			children.append(_serialize_node(child, max_depth, depth + 1))
+	payload["children"] = children
+	return payload
 
 
 func _notify_filesystem_file_changed(resource_path: String) -> void:

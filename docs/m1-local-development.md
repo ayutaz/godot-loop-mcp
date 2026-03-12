@@ -65,7 +65,7 @@ npm --prefix packages/server run smoke:m1
 - capability manifest には `editor.console.capture` を追加し、`Godot 4.5+` で logger 登録に成功した場合だけ `enabled` になります
 - `M2` 実装後は、headless play の直後に `runtime-log-file` backend が返ることがあります
 - `smoke:m1` は先に `clear_output_logs` を呼び、`editor-console-buffer` と `bridge-log-fallback` のどちらが返るべきかを検証します
-- runtime telemetry や tests 連携は引き続き M4 以降で拡張します
+- runtime telemetry / tests / prompts / templates は `docs/m4-local-development.md` の current behavior を参照します
 
 ## 5. 現状の hardening
 

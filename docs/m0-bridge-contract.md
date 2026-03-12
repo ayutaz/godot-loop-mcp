@@ -96,7 +96,13 @@ M0 では Addon が `enabled` と `planned` の両方を送って構いません
 - `logs.clear` (`enabled`)
 - `editor.console.capture` (`enabled` on `Godot 4.5+`, `disabled` on `4.4`)
 - `play.control` (`enabled`)
-- `runtime.debug` (`planned`)
+- `tests.run` (`enabled` when adapter is detected or configured)
+- `screenshot.editor` (`enabled` on GUI editor, `disabled` on headless)
+- `screenshot.runtime` (`enabled` on GUI editor, `disabled` on headless)
+- `runtime.debug` (`enabled` on GUI editor, `disabled` on headless)
+- `danger.execute_editor_script` (`enabled` only in `Dangerous` + opt-in)
+- `danger.filesystem_write_raw` (`enabled` only in `Dangerous` + allowlist)
+- `danger.os_shell` (`enabled` only in `Dangerous` + allowlist)
 
 現行 server の `mcp` catalog は ready addon session の capability に応じて変化します。未接続時は fallback log surface のみを公開し、handshake 完了後に enabled capability 分の tools/resources を追加公開します。
 
@@ -106,7 +112,7 @@ M0 では Addon が `enabled` と `planned` の両方を送って構いません
 - `WorkspaceWrite`: 通常の scene/script 編集と保存
 - `Dangerous`: 任意コード実行や OS 操作を含む
 
-M0 の初期実装は `ReadOnly` 固定でしたが、現行 branch では `M2` に合わせて Addon / server ともに `WorkspaceWrite` へ拡張済みです。
+M0 の初期実装は `ReadOnly` 固定でしたが、現行 branch では env / project settings を通じて `ReadOnly`, `WorkspaceWrite`, `Dangerous` を切り替えられます。
 
 ## Timeout / Reconnect
 

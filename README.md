@@ -12,7 +12,7 @@
 
 ## ステータス
 
-このリポジトリは立ち上げ初期段階ですが、`M0` から `M3` は完了し、`M5` の CI/CD 基盤にも着手済みです。
+このリポジトリは立ち上げ初期段階ですが、`M0` から `M4` と `M6` は実装済みで、`M5` は release hardening を残して進行中です。
 
 現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
@@ -21,9 +21,12 @@
 - 実装済み: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, MCP tool error hardening
 - 実装済み: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, `smoke:m2`
 - 実装済み: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, `smoke:m3`
+- 実装済み: `M4` `run_tests`, dynamic prompts, resource templates, capability-gated screenshot/runtime debug surface, `smoke:m4`
+- 実装済み: `M5` security level enforcement と `.godot/mcp/audit.log`
+- 実装済み: `M6` `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, `smoke:m6`
 - 実装済み: active addon session の capability manifest に応じて MCP tools/resources を動的公開し、未接続時は fallback log surface のみを露出
 - 実装済み: `Godot 4.5+` では `OS.add_logger()` による editor console capture、headless play output は `.godot/mcp/runtime.log` を返し、`4.4` では `.godot/mcp` fallback
-- 次の対象: `M4` の tests / screenshot / telemetry
+- 進行中: GitHub Actions への `run_tests` / report artifact の本格統合、release hardening、trusted publishing 設定
 - 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD 計画: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -108,6 +111,42 @@ M3 の search / UID / dynamic capability surface は実装済みです。
 npm --prefix packages/server run typecheck
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm --prefix packages/server run smoke:m3
+```
+
+## M4 Verification
+
+M4 の verification loop hardening は実装済みです。
+
+- 手順: [docs/m4-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m4-local-development.md)
+- tools: `run_tests`, `get_editor_screenshot`, `get_running_scene_screenshot`, `get_runtime_debug_events`, `clear_runtime_debug_events`
+- prompts: `godot_editor_strategy`, `godot_ui_layout_strategy`, `godot_debug_loop`, `godot_scene_edit_safety`
+- resource templates: `godot://scene/{path}`, `godot://script/{path}`, `godot://node/{scenePath}/{nodePath}`, `godot://resource/{uid}`
+- notes: screenshot は GUI editor でのみ enable。`runtime.debug` は GUI editor に加えて `runtime_telemetry.gd` の autoload 登録が必要で、headless では hidden
+
+確認済みコマンド:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m4
+```
+
+## M5/M6 Security
+
+security enforcement と dangerous mode の最小実装は入っています。
+
+- 手順: [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)
+- security levels: `ReadOnly`, `WorkspaceWrite`, `Dangerous`
+- audit: `.godot/mcp/audit.log`
+- dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
+- gating: server/addon の `Dangerous` 指定に加え、write prefix / shell allowlist / editor script opt-in が必要
+
+確認済みコマンド:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m6
 ```
 
 ## ライセンス
