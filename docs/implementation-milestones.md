@@ -46,7 +46,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 | Milestone | 状態 | 実装/確認内容 |
 | --- | --- | --- |
 | `M0` | 完了 | Addon skeleton, TypeScript server skeleton, `bridge.handshake.hello`, `bridge.handshake.sync`, 双方向 `bridge.ping`, capability logging, reconnect policy, ローカル手順書を追加済み |
-| `M1` | 着手 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。addon 側 error は MCP tool error に反映。smoke は legacy `addon-staging` を退避して UID duplicate warning を回避。`Godot 4.5+` では `OS.add_logger()` 由来の editor console capture、`4.4` では `.godot/mcp` fallback を返す |
+| `M1` | 完了 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。addon 側 error は MCP tool error に反映。smoke は legacy `addon-staging` を退避して UID duplicate warning を回避。`Godot 4.5+` では `OS.add_logger()` 由来の editor console capture、`4.4` では `.godot/mcp` fallback を返す |
 | `M2` | 未着手 | scene/script 編集と play/stop はまだ未実装 |
 | `M3` | 未着手 | 計画のみ |
 | `M4` | 未着手 | 計画のみ |
@@ -65,6 +65,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 - `scripts/actions/install-godot.ps1` で `4.4.1-stable`, `4.5.1-stable` の取得を確認
 - `npm --prefix packages/server run typecheck`
 - `npm --prefix packages/server run smoke:m1`
+- `scripts/actions/run-bridge-smoke.ps1` を hardening 後の plugin lifecycle で再確認
 
 CI/CD 詳細計画:
 
@@ -187,6 +188,7 @@ AI が Godot Editor の現在状態を安全に観測できるようにし、破
 
 - `npm --prefix packages/server run typecheck`
 - `$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source; npm --prefix packages/server run smoke:m1`
+- `powershell -ExecutionPolicy Bypass -File scripts/actions/run-bridge-smoke.ps1 -RepoRoot $PWD.Path -GodotBinaryPath (Get-Command godot_console.exe).Source`
 
 ### 後回し項目
 

@@ -12,15 +12,15 @@ The project is intended to provide:
 
 ## Status
 
-This repository is still in the bootstrap phase, but `M0` is complete and `M5` CI/CD groundwork is in progress.
+This repository is still in the bootstrap phase, but `M0` and `M1` are complete and `M5` CI/CD groundwork is in progress.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
 - Implemented: addon skeleton, TypeScript server skeleton, `handshake`, bidirectional `ping`, capability manifest, reconnect policy
 - Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, and release-asset scaffolding
-- Implemented: `M1` core read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`
+- Implemented: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, and MCP tool error hardening
 - Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, with `.godot/mcp` fallback on `4.4`
-- Next target: `M1` hardening and the `M2` edit/play loop
+- Next target: the `M2` edit/play loop
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -56,7 +56,7 @@ As of 2026-03-12, GitHub Actions defines:
 
 ## M1 Observation
 
-The core M1 read-only observation surface is now implemented.
+The M1 read-only observation surface and hardening pass are now implemented.
 
 - Guide: [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
 - tools: `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script`, `get_output_logs`, `get_godot_errors`

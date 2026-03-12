@@ -22,3 +22,5 @@ For the M1 read-only observation smoke:
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm run smoke:m1
 ```
+
+On `Godot 4.5+`, `get_output_logs` / `get_godot_errors` prefer the addon-side editor console ring buffer via `OS.add_logger()`. On `Godot 4.4`, they fall back to `.godot/mcp` addon/server logs.

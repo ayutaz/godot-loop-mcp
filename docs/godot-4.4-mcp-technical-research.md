@@ -5,15 +5,16 @@
 ## 実装追記
 
 この文書は設計判断の調査記録です。  
-2026-03-12 時点で `M0: Foundation and Contracts` の最小実装は repo に反映済みで、`M5` の CI/CD 基盤にも着手済みです。
+2026-03-12 時点で `M0: Foundation and Contracts` と `M1: Read-Only Observation MVP` は repo に反映済みで、`M5` の CI/CD 基盤にも着手済みです。
 
 - 現行の bridge 契約: `docs/m0-bridge-contract.md`
 - 現行のローカル起動手順: `docs/m0-local-development.md`
+- 現行の M1 観測手順: `docs/m1-local-development.md`
 - 現行の進行計画: `docs/implementation-milestones.md`
 - 現行の CI/CD 計画: `docs/github-actions-cicd-plan.md`
 
-実装済みの範囲は `Addon skeleton + TypeScript server skeleton + localhost TCP bridge + handshake + bidirectional ping + capability logging + GitHub Actions CI/CD groundwork` です。  
-この調査文書より現行挙動の source of truth を優先する場合は、上記 3 文書と実装コードを参照してください。
+実装済みの範囲は `Addon skeleton + TypeScript server skeleton + localhost TCP bridge + handshake + bidirectional ping + capability logging + M1 read-only observation + 4.5+ editor console capture + GitHub Actions CI/CD groundwork` です。  
+この調査文書より現行挙動の source of truth を優先する場合は、上記文書と実装コードを参照してください。
 
 ## 結論
 

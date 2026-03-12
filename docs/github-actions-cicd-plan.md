@@ -177,7 +177,13 @@ PR で回す job:
 - `observation-integration`
   - fixture project か sample scene を開く
   - resource/tool 呼び出し結果を snapshot で検証
+  - `Godot 4.5+` では `editor-console-buffer`、`4.4` では `bridge-log-fallback` を検証
   - large output の paging か file fallback を検証
+
+現状メモ:
+
+- `smoke:m1` で version-aware log backend の切り替え確認は実装済み
+- CI の専用 `observation-integration` job はまだ未追加
 
 ### Phase C: M2 Edit/Play CI
 

@@ -1,6 +1,6 @@
 # M1 Local Development
 
-2026-03-12 時点で、この手順による M1 read-only observation の typecheck と smoke を確認済みです。
+2026-03-12 時点で、この手順による M1 read-only observation と hardening の typecheck / smoke を確認済みです。
 
 ## 前提
 
@@ -42,10 +42,12 @@ npm --prefix packages/server run smoke:m1
 - `get_scene_tree`
 - `get_open_scripts`
 - `get_output_logs`
+- `get_godot_errors`
 - `godot://project/info`
 - `godot://scene/current`
 - `godot://scene/tree`
 - addon 側 request error が MCP tool error として返ること
+- Godot version に応じて `editor-console-buffer` / `bridge-log-fallback` の backend が切り替わること
 
 補足:
 
