@@ -19,6 +19,7 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 - Implemented: addon skeleton, TypeScript server skeleton, `handshake`, bidirectional `ping`, capability manifest, reconnect policy
 - Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, and release-asset scaffolding
 - Implemented: `M1` core read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`
+- Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, with `.godot/mcp` fallback on `4.4`
 - Next target: `M1` hardening and the `M2` edit/play loop
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
@@ -60,6 +61,7 @@ The core M1 read-only observation surface is now implemented.
 - Guide: [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
 - tools: `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script`, `get_output_logs`, `get_godot_errors`
 - resources: `godot://project/info`, `godot://scene/current`, `godot://scene/tree`, `godot://scripts/open`, `godot://script/current`, `godot://errors/latest`
+- logs: `Godot 4.5+` prefers the addon ring buffer, while `Godot 4.4` falls back to `.godot/mcp` addon/server logs
 
 Verified commands:
 

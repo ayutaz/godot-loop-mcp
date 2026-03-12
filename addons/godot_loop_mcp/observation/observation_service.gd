@@ -1,13 +1,39 @@
 @tool
 extends RefCounted
 
+const EditorConsoleCapture = preload("res://addons/godot_loop_mcp/observation/editor_console_capture.gd")
+
 var _editor_interface: EditorInterface
 var _workspace_root := ""
+var _console_capture
 
 
 func _init(editor_interface: EditorInterface, workspace_root: String) -> void:
 	_editor_interface = editor_interface
 	_workspace_root = workspace_root
+	_console_capture = EditorConsoleCapture.new()
+
+
+func dispose() -> void:
+	if _console_capture != null and _console_capture.has_method("dispose"):
+		_console_capture.dispose()
+	_console_capture = null
+
+
+func get_capability_overrides() -> Dictionary:
+	if _console_capture != null and _console_capture.has_method("get_capability_overrides"):
+		return _console_capture.get_capability_overrides()
+	return {"editor.console.capture": "disabled"}
+
+
+func get_console_capture_status() -> Dictionary:
+	if _console_capture != null and _console_capture.has_method("get_status_payload"):
+		return _console_capture.get_status_payload()
+	return {
+		"supported": false,
+		"enabled": false,
+		"reason": "Console capture service is unavailable."
+	}
 
 
 func handle_request(method: String, params: Variant = {}) -> Dictionary:
@@ -28,6 +54,10 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			return _ok(_build_open_scripts_payload())
 		"godot.script.view":
 			return _view_script(request_params)
+		"godot.logs.get_output":
+			return _get_output_logs(request_params)
+		"godot.logs.get_errors":
+			return _get_error_logs(request_params)
 		_:
 			return {"handled": false}
 
@@ -125,7 +155,7 @@ func _view_script(params: Dictionary) -> Dictionary:
 
 	if requested_path != "":
 		target_script = _find_open_script_by_path(requested_path)
-		if target_script == null:
+		if target_script == null and ResourceLoader.exists(requested_path, "Script"):
 			var loaded := ResourceLoader.load(requested_path, "Script")
 			if loaded is Script:
 				target_script = loaded
@@ -143,6 +173,20 @@ func _view_script(params: Dictionary) -> Dictionary:
 			"source": source_code
 		}
 	)
+
+
+func _get_output_logs(params: Dictionary) -> Dictionary:
+	if not _is_console_capture_enabled():
+		return _error(-32005, "Editor console capture is unavailable.", get_console_capture_status())
+
+	return _ok(_console_capture.get_output_payload(int(params.get("limit", 100))))
+
+
+func _get_error_logs(params: Dictionary) -> Dictionary:
+	if not _is_console_capture_enabled():
+		return _error(-32005, "Editor console capture is unavailable.", get_console_capture_status())
+
+	return _ok(_console_capture.get_error_payload(int(params.get("limit", 100))))
 
 
 func _serialize_node(node: Node, max_depth: int, depth: int) -> Dictionary:
@@ -320,3 +364,8 @@ func _error(code: int, message: String, data: Variant = null) -> Dictionary:
 		"handled": true,
 		"error": error
 	}
+
+
+func _is_console_capture_enabled() -> bool:
+	var status := get_console_capture_status()
+	return bool(status.get("enabled", false))

@@ -45,9 +45,27 @@ npm --prefix packages/server run smoke:m1
 - `godot://project/info`
 - `godot://scene/current`
 - `godot://scene/tree`
+- addon 側 request error が MCP tool error として返ること
+
+補足:
+
+- smoke 実行時は `dist/release*/addon-staging` のような legacy package staging directory を一時退避し、Godot の UID duplicate warning を避けます
 
 ## 4. 現状の log scope
 
-`get_output_logs` と `get_godot_errors` は、現時点では Godot 全体の editor console ではなく、`.godot/mcp/addon.log` と `.godot/mcp/server.log` を参照します。
+`get_output_logs` と `get_godot_errors` は、`Godot 4.5+` では addon が `OS.add_logger()` を登録して editor console を ring buffer に保持し、その payload を優先して返します。
 
-これは M1 の安全な観測面を優先した暫定実装で、runtime telemetry や tests 連携は M4 以降で拡張します。
+`Godot 4.4` では public API に同等手段がないため、`.godot/mcp/addon.log` と `.godot/mcp/server.log` を fallback として返します。
+
+補足:
+
+- capability manifest には `editor.console.capture` を追加し、`Godot 4.5+` で logger 登録に成功した場合だけ `enabled` になります
+- `smoke:m1` は Godot version を見て、`editor-console-buffer` と `bridge-log-fallback` のどちらが返るべきかを検証します
+- runtime telemetry や tests 連携は引き続き M4 以降で拡張します
+
+## 5. 現状の hardening
+
+- `view_script` の不正 path は editor console に余計な load error を出さず、tool error として返します
+- addon 側の request error は server 側で握りつぶさず、MCP tool error (`isError`) として返します
+- `scripts/actions/package-addon.ps1` は staging を一時ディレクトリで作るため、今後の package 実行で `addon-staging` を project 配下に残しません
+- `get_output_logs` / `get_godot_errors` は `Godot 4.5+` なら addon ring buffer、`4.4` なら `.godot/mcp` fallback を返します

@@ -3,6 +3,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
 
 async function main(): Promise<void> {
   const packageRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -30,6 +31,7 @@ async function main(): Promise<void> {
   });
 
   let godotProcess: ChildProcess | undefined;
+  const scanQuarantineState = await suspendProjectScanConflicts(repoRoot);
   try {
     await client.connect(transport);
     godotProcess = spawn(
@@ -43,6 +45,8 @@ async function main(): Promise<void> {
 
     const projectInfo = await waitForProjectInfo(client, 45_000);
     assertString(projectInfo.projectName, "projectName");
+    assertString(projectInfo.godotVersion, "godotVersion");
+    const expectsEditorConsoleCapture = supportsEditorConsoleCapture(projectInfo.godotVersion);
 
     console.error("Checking tool catalog...");
     const tools = await client.listTools();
@@ -57,27 +61,50 @@ async function main(): Promise<void> {
 
     console.error("Calling get_editor_state...");
     const editorState = await callToolJson(client, "get_editor_state");
-    if (!Array.isArray(editorState.openScenePaths)) {
+    if (!Array.isArray(editorState.payload.openScenePaths)) {
       throw new Error("get_editor_state.openScenePaths must be an array.");
     }
 
     console.error("Calling get_scene_tree...");
     const sceneTree = await callToolJson(client, "get_scene_tree");
-    if (typeof sceneTree.sceneAvailable !== "boolean") {
+    if (typeof sceneTree.payload.sceneAvailable !== "boolean") {
       throw new Error("get_scene_tree.sceneAvailable must be a boolean.");
+    }
+
+    console.error("Checking addon validation path...");
+    const invalidViewScript = await callToolJson(
+      client,
+      "view_script",
+      { path: "res://__missing__/not_found.gd" },
+      { allowToolError: true }
+    );
+    if (
+      !invalidViewScript.isError ||
+      invalidViewScript.payload.available !== false ||
+      invalidViewScript.payload.source !== "addon"
+    ) {
+      throw new Error("view_script invalid path must surface an addon error payload.");
     }
 
     console.error("Calling get_open_scripts...");
     const openScripts = await callToolJson(client, "get_open_scripts");
-    if (!Array.isArray(openScripts.scripts)) {
+    if (!Array.isArray(openScripts.payload.scripts)) {
       throw new Error("get_open_scripts.scripts must be an array.");
     }
 
     console.error("Calling get_output_logs...");
     const logs = await callToolJson(client, "get_output_logs", { limit: 20 });
-    if (!Array.isArray(logs.entries)) {
+    if (!Array.isArray(logs.payload.entries)) {
       throw new Error("get_output_logs.entries must be an array.");
     }
+    assertLogBackend(logs.payload, expectsEditorConsoleCapture, "get_output_logs");
+
+    console.error("Calling get_godot_errors...");
+    const errors = await callToolJson(client, "get_godot_errors", { limit: 20 });
+    if (!Array.isArray(errors.payload.entries)) {
+      throw new Error("get_godot_errors.entries must be an array.");
+    }
+    assertLogBackend(errors.payload, expectsEditorConsoleCapture, "get_godot_errors");
 
     console.error("Reading godot://project/info...");
     const projectResource = await readResourceJson(client, "godot://project/info");
@@ -97,11 +124,12 @@ async function main(): Promise<void> {
 
     console.error("M1 observation smoke passed.");
   } finally {
-    await client.close().catch(() => undefined);
-    await transport.close().catch(() => undefined);
     if (godotProcess && !godotProcess.killed) {
       godotProcess.kill();
     }
+    await client.close().catch(() => undefined);
+    await transport.close().catch(() => undefined);
+    await resumeProjectScanConflicts(scanQuarantineState).catch(() => undefined);
   }
 }
 
@@ -110,12 +138,12 @@ async function waitForProjectInfo(client: Client, timeoutMs: number): Promise<Re
   let lastReason = "Addon session did not become ready.";
 
   while (Date.now() < deadline) {
-    const payload = await callToolJson(client, "get_project_info", undefined, false);
-    if (payload.available !== false) {
-      return payload;
+    const result = await callToolJson(client, "get_project_info", undefined, { allowToolError: true });
+    if (!result.isError) {
+      return result.payload;
     }
 
-    lastReason = typeof payload.reason === "string" ? payload.reason : lastReason;
+    lastReason = typeof result.payload.reason === "string" ? result.payload.reason : lastReason;
     await delay(1000);
   }
 
@@ -126,8 +154,10 @@ async function callToolJson(
   client: Client,
   name: string,
   args?: Record<string, unknown>,
-  throwOnToolError = true
-): Promise<Record<string, unknown>> {
+  options: {
+    allowToolError?: boolean;
+  } = {}
+): Promise<{ payload: Record<string, unknown>; isError: boolean }> {
   const result = await client.callTool({
     name,
     arguments: args ?? {}
@@ -140,11 +170,14 @@ async function callToolJson(
     ? result.structuredContent
     : parseFirstTextBlock(content);
 
-  if (result.isError && throwOnToolError) {
+  if (result.isError && !options.allowToolError) {
     throw new Error(`${name} returned an MCP tool error: ${JSON.stringify(payload)}`);
   }
 
-  return payload;
+  return {
+    payload,
+    isError: !!result.isError
+  };
 }
 
 async function readResourceJson(client: Client, uri: string): Promise<Record<string, unknown>> {
@@ -194,6 +227,38 @@ function assertContains(values: string[], expected: string, label: string): void
 function assertString(value: unknown, label: string): void {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${label} must be a non-empty string.`);
+  }
+}
+
+function supportsEditorConsoleCapture(version: unknown): boolean {
+  if (typeof version !== "string") {
+    return false;
+  }
+
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)/u);
+  if (!match) {
+    return false;
+  }
+
+  const major = Number.parseInt(match[1] ?? "0", 10);
+  const minor = Number.parseInt(match[2] ?? "0", 10);
+  return major > 4 || (major === 4 && minor >= 5);
+}
+
+function assertLogBackend(
+  payload: Record<string, unknown>,
+  expectsEditorConsoleCapture: boolean,
+  label: string
+): void {
+  if (typeof payload.backend !== "string") {
+    throw new Error(`${label}.backend must be a string.`);
+  }
+
+  const expectedBackend = expectsEditorConsoleCapture
+    ? "editor-console-buffer"
+    : "bridge-log-fallback";
+  if (payload.backend !== expectedBackend) {
+    throw new Error(`${label}.backend must be ${expectedBackend}, got ${payload.backend}.`);
   }
 }
 

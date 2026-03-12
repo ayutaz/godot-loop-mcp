@@ -49,11 +49,11 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
   },
   {
     name: "get_output_logs",
-    description: "Read the latest bridge/addon log lines from .godot/mcp."
+    description: "Read editor console logs when available, otherwise fall back to .godot/mcp."
   },
   {
     name: "get_godot_errors",
-    description: "Read the latest error-level bridge/addon log lines from .godot/mcp."
+    description: "Read editor console errors when available, otherwise fall back to .godot/mcp."
   }
 ];
 
@@ -86,7 +86,7 @@ export const MCP_RESOURCES: McpResourceCatalogEntry[] = [
   {
     name: "errors-latest",
     uri: "godot://errors/latest",
-    description: "Latest error-level bridge/addon logs."
+    description: "Latest error-level editor console logs with bridge-log fallback."
   }
 ];
 

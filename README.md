@@ -19,6 +19,7 @@
 - 実装済み: addon skeleton, TypeScript server skeleton, `handshake`, 双方向 `ping`, capability manifest, reconnect policy
 - 実装済み: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, release asset 生成の足場
 - 実装済み: `M1` core read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`
+- 実装済み: `Godot 4.5+` では `OS.add_logger()` による editor console capture、`4.4` では `.godot/mcp` fallback
 - 次の対象: `M1` の hardening と `M2` の edit/play loop
 - 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD 計画: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
@@ -60,6 +61,7 @@ M1 の core read-only observation は実装済みです。
 - 手順: [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
 - tools: `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script`, `get_output_logs`, `get_godot_errors`
 - resources: `godot://project/info`, `godot://scene/current`, `godot://scene/tree`, `godot://scripts/open`, `godot://script/current`, `godot://errors/latest`
+- logs: `Godot 4.5+` では addon ring buffer を優先し、`Godot 4.4` では `.godot/mcp` の addon/server log に fallback
 
 確認済みコマンド:
 

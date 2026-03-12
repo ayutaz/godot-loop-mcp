@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-type LogSource = "addon" | "server";
+export type LogSource = "addon" | "server" | "editor-console";
+type LogBackend = "bridge-log-fallback" | "editor-console-buffer";
 
 export interface OutputLogEntry {
   source: LogSource;
@@ -13,8 +14,18 @@ export interface OutputLogEntry {
 
 export interface OutputLogPayload {
   note: string;
-  logDir: string;
+  backend: LogBackend;
+  captureAvailable: boolean;
+  captureUsed: boolean;
+  logDir?: string;
+  fallbackReason?: string;
   entries: OutputLogEntry[];
+}
+
+interface FallbackLogOptions {
+  note?: string;
+  captureAvailable?: boolean;
+  fallbackReason?: string;
 }
 
 const LOG_FILES: Array<{ source: LogSource; fileName: string }> = [
@@ -22,23 +33,41 @@ const LOG_FILES: Array<{ source: LogSource; fileName: string }> = [
   { source: "server", fileName: "server.log" }
 ];
 
-export function readOutputLogs(logDir: string, limit = 100): OutputLogPayload {
+export function readOutputLogs(
+  logDir: string,
+  limit = 100,
+  options: FallbackLogOptions = {}
+): OutputLogPayload {
   const entries = readMergedEntries(logDir, limit);
   return {
-    note: "Current implementation reads addon/server bridge logs from .godot/mcp.",
+    note: options.note ?? "Current implementation reads addon/server bridge logs from .godot/mcp.",
+    backend: "bridge-log-fallback",
+    captureAvailable: options.captureAvailable ?? false,
+    captureUsed: false,
     logDir,
+    fallbackReason: options.fallbackReason,
     entries
   };
 }
 
-export function readErrorLogs(logDir: string, limit = 100): OutputLogPayload {
+export function readErrorLogs(
+  logDir: string,
+  limit = 100,
+  options: FallbackLogOptions = {}
+): OutputLogPayload {
   const entries = readMergedEntries(logDir, limit * 2)
     .filter((entry) => entry.level === "ERROR")
     .slice(-limit);
 
   return {
-    note: "Current implementation filters error-level addon/server bridge logs from .godot/mcp.",
+    note:
+      options.note ??
+      "Current implementation filters error-level addon/server bridge logs from .godot/mcp.",
+    backend: "bridge-log-fallback",
+    captureAvailable: options.captureAvailable ?? false,
+    captureUsed: false,
     logDir,
+    fallbackReason: options.fallbackReason,
     entries
   };
 }

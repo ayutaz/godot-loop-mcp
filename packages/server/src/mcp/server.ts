@@ -4,7 +4,7 @@ import * as z from "zod/v4";
 import { SERVER_VERSION } from "../capabilities/serverManifest.ts";
 import type { ServerConfig } from "../config.ts";
 import type { Logger } from "../logger.ts";
-import { readErrorLogs, readOutputLogs } from "../observation/logs.ts";
+import { readErrorLogs, readOutputLogs, type OutputLogPayload } from "../observation/logs.ts";
 import type { AddonSession } from "../transport/addonSession.ts";
 
 interface CreateMcpBridgeServerInput {
@@ -19,6 +19,20 @@ export interface McpBridgeServerRuntime {
 }
 
 type JsonObject = Record<string, unknown>;
+type LogKind = "output" | "errors";
+type AddonPayloadResult =
+  | {
+      ok: true;
+      payload: JsonObject;
+    }
+  | {
+      ok: false;
+      error: JsonObject;
+    };
+
+const EDITOR_CONSOLE_CAPTURE_CAPABILITY = "editor.console.capture";
+const ADDON_OUTPUT_LOG_METHOD = "godot.logs.get_output";
+const ADDON_ERROR_LOG_METHOD = "godot.logs.get_errors";
 
 export function createMcpBridgeServer({
   config,
@@ -128,25 +142,42 @@ function registerTools(
   server.registerTool(
     "get_output_logs",
     {
-      description: "Read the latest bridge/addon log lines from .godot/mcp.",
+      description: "Read the latest editor console logs when available, otherwise fall back to .godot/mcp.",
       inputSchema: {
         limit: z.number().int().min(1).max(500).optional()
       }
     },
     async ({ limit }) =>
-      formatToolResult(readOutputLogs(config.logDir, limit ?? 100) as unknown as JsonObject)
+      formatToolResult(
+        (await readObservedLogs(
+          "output",
+          config,
+          logger,
+          getActiveSession,
+          limit ?? 100
+        )) as unknown as JsonObject
+      )
   );
 
   server.registerTool(
     "get_godot_errors",
     {
-      description: "Read the latest error-level bridge/addon log lines from .godot/mcp.",
+      description:
+        "Read the latest editor console errors when available, otherwise fall back to .godot/mcp.",
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional()
       }
     },
     async ({ limit }) =>
-      formatToolResult(readErrorLogs(config.logDir, limit ?? 100) as unknown as JsonObject)
+      formatToolResult(
+        (await readObservedLogs(
+          "errors",
+          config,
+          logger,
+          getActiveSession,
+          limit ?? 100
+        )) as unknown as JsonObject
+      )
   );
 }
 
@@ -175,8 +206,13 @@ function registerResources(
     },
     async () => {
       const payload = await readAddonPayload(getActiveSession, logger, "godot.editor.get_state");
-      const state = payload ?? unavailablePayload("No ready addon session.");
+      if (!payload.ok) {
+        return formatResourceResult("godot://scene/current", payload.error);
+      }
+
+      const state = payload.payload;
       return formatResourceResult("godot://scene/current", {
+        available: true,
         currentScenePath: state.currentScenePath ?? "",
         currentSceneRootName: state.currentSceneRootName ?? "",
         openScenePaths: state.openScenePaths ?? [],
@@ -221,15 +257,63 @@ function registerResources(
     "errors-latest",
     "godot://errors/latest",
     {
-      description: "Latest error-level bridge/addon logs.",
+      description: "Latest error-level editor console logs with bridge-log fallback.",
       mimeType: "application/json"
     },
     async () =>
       formatResourceResult(
         "godot://errors/latest",
-        readErrorLogs(config.logDir, 100) as unknown as JsonObject
+        (await readObservedLogs(
+          "errors",
+          config,
+          logger,
+          getActiveSession,
+          100
+        )) as unknown as JsonObject
       )
   );
+}
+
+async function readObservedLogs(
+  kind: LogKind,
+  config: ServerConfig,
+  logger: Logger,
+  getActiveSession: () => AddonSession | undefined,
+  limit: number
+): Promise<OutputLogPayload> {
+  const session = getActiveSession();
+  const captureAvailable = session?.hasCapability(EDITOR_CONSOLE_CAPTURE_CAPABILITY) ?? false;
+
+  if (!session || !captureAvailable) {
+    return readLogFallback(kind, config.logDir, limit, {
+      captureAvailable,
+      fallbackReason: session
+        ? "editor.console.capture is unavailable for the connected addon."
+        : "No ready addon session."
+    });
+  }
+
+  const result = await readAddonPayload(
+    getActiveSession,
+    logger,
+    kind === "output" ? ADDON_OUTPUT_LOG_METHOD : ADDON_ERROR_LOG_METHOD,
+    { limit }
+  );
+  if (!result.ok) {
+    return readLogFallback(kind, config.logDir, limit, {
+      captureAvailable: true,
+      fallbackReason: typeof result.error.reason === "string" ? result.error.reason : "Addon log request failed."
+    });
+  }
+
+  if (!Array.isArray(result.payload.entries)) {
+    return readLogFallback(kind, config.logDir, limit, {
+      captureAvailable: true,
+      fallbackReason: "Addon log payload was malformed."
+    });
+  }
+
+  return normalizeAddonLogPayload(result.payload);
 }
 
 async function callAddonTool(
@@ -238,12 +322,12 @@ async function callAddonTool(
   method: string,
   params: JsonObject = {}
 ): Promise<ReturnType<typeof formatToolResult>> {
-  const payload = await readAddonPayload(getActiveSession, logger, method, params);
-  if (!payload) {
-    return formatToolError(unavailablePayload("No ready addon session."));
+  const result = await readAddonPayload(getActiveSession, logger, method, params);
+  if (!result.ok) {
+    return formatToolError(result.error);
   }
 
-  return formatToolResult(payload);
+  return formatToolResult(result.payload);
 }
 
 async function readAddonResource(
@@ -253,8 +337,8 @@ async function readAddonResource(
   method: string,
   params: JsonObject = {}
 ): Promise<ReturnType<typeof formatResourceResult>> {
-  const payload = await readAddonPayload(getActiveSession, logger, method, params);
-  return formatResourceResult(uri, payload ?? unavailablePayload("No ready addon session."));
+  const result = await readAddonPayload(getActiveSession, logger, method, params);
+  return formatResourceResult(uri, result.ok ? result.payload : result.error);
 }
 
 async function readAddonPayload(
@@ -262,25 +346,32 @@ async function readAddonPayload(
   logger: Logger,
   method: string,
   params: JsonObject = {}
-): Promise<JsonObject | undefined> {
+): Promise<AddonPayloadResult> {
   const session = getActiveSession();
   if (!session) {
-    return undefined;
+    return {
+      ok: false,
+      error: unavailablePayload("No ready addon session.")
+    };
   }
 
   try {
     const result = await session.request<JsonObject>(method, params);
-    return isJsonObject(result) ? result : { value: result };
+    return {
+      ok: true,
+      payload: isJsonObject(result) ? result : { value: result }
+    };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     logger.warn("Addon observation request failed.", {
       sessionId: session.getSessionId(),
       method,
-      error: error instanceof Error ? error.message : String(error)
+      error: message
     });
+
     return {
-      available: false,
-      reason: error instanceof Error ? error.message : String(error),
-      method
+      ok: false,
+      error: addonRequestErrorPayload(method, message)
     };
   }
 }
@@ -329,6 +420,52 @@ function unavailablePayload(reason: string): JsonObject {
   return {
     available: false,
     reason
+  };
+}
+
+function addonRequestErrorPayload(method: string, message: string): JsonObject {
+  return {
+    available: false,
+    source: "addon",
+    method,
+    reason: message
+  };
+}
+
+function readLogFallback(
+  kind: LogKind,
+  logDir: string,
+  limit: number,
+  options: {
+    captureAvailable: boolean;
+    fallbackReason: string;
+  }
+): OutputLogPayload {
+  return kind === "output"
+    ? readOutputLogs(logDir, limit, {
+        captureAvailable: options.captureAvailable,
+        fallbackReason: options.fallbackReason,
+        note: "Fell back to addon/server bridge logs from .godot/mcp."
+      })
+    : readErrorLogs(logDir, limit, {
+        captureAvailable: options.captureAvailable,
+        fallbackReason: options.fallbackReason,
+        note: "Fell back to error-level addon/server bridge logs from .godot/mcp."
+      });
+}
+
+function normalizeAddonLogPayload(payload: JsonObject): OutputLogPayload {
+  return {
+    note:
+      typeof payload.note === "string"
+        ? payload.note
+        : "Reads editor console entries from the addon ring buffer.",
+    backend: "editor-console-buffer",
+    captureAvailable: payload.captureAvailable !== false,
+    captureUsed: payload.captureUsed !== false,
+    fallbackReason:
+      typeof payload.fallbackReason === "string" ? payload.fallbackReason : undefined,
+    entries: payload.entries as OutputLogPayload["entries"]
   };
 }
 

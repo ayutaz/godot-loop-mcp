@@ -94,6 +94,13 @@ export class AddonSession {
     return this.addonHello;
   }
 
+  hasCapability(capabilityId: string): boolean {
+    const manifest = this.addonHello?.capabilities.capabilities ?? [];
+    return manifest.some(
+      (capability) => capability.id === capabilityId && capability.availability === "enabled"
+    );
+  }
+
   request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
     if (!this.isReady()) {
       return Promise.reject(new Error("Addon session is not ready."));

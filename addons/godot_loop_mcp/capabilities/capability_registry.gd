@@ -6,7 +6,8 @@ const PLUGIN_VERSION := "0.1.0"
 const SECURITY_LEVEL := "ReadOnly"
 
 
-func build_manifest() -> Dictionary:
+func build_manifest(capability_overrides: Dictionary = {}) -> Dictionary:
+	var editor_console_capture := str(capability_overrides.get("editor.console.capture", "disabled"))
 	return {
 		"schemaVersion": PROTOCOL_VERSION,
 		"securityLevel": SECURITY_LEVEL,
@@ -51,7 +52,13 @@ func build_manifest() -> Dictionary:
 				"id": "logs.read",
 				"surface": "tool",
 				"availability": "enabled",
-				"description": "Exposes addon and bridge log inspection."
+				"description": "Exposes log inspection with addon/server fallback."
+			},
+			{
+				"id": "editor.console.capture",
+				"surface": "tool",
+				"availability": editor_console_capture,
+				"description": "Captures editor console messages through OS.add_logger() on Godot 4.5+."
 			},
 			{
 				"id": "runtime.debug",
@@ -63,7 +70,12 @@ func build_manifest() -> Dictionary:
 	}
 
 
-func build_client_identity(workspace_root: String, godot_version: String, reconnect_policy: Dictionary) -> Dictionary:
+func build_client_identity(
+	workspace_root: String,
+	godot_version: String,
+	reconnect_policy: Dictionary,
+	capability_overrides: Dictionary = {}
+) -> Dictionary:
 	return {
 		"protocolVersion": PROTOCOL_VERSION,
 		"role": "addon",
@@ -76,7 +88,7 @@ func build_client_identity(workspace_root: String, godot_version: String, reconn
 			"editor": true
 		},
 		"securityLevel": SECURITY_LEVEL,
-		"capabilities": build_manifest(),
+		"capabilities": build_manifest(capability_overrides),
 		"workspaceRoot": workspace_root,
 		"reconnectPolicy": reconnect_policy
 	}

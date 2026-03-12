@@ -40,6 +40,7 @@ func _exit_tree() -> void:
 	remove_tool_menu_item(MENU_DISCONNECT)
 	_append_log("info", "Plugin disabled.", {"state": _current_state})
 	_dispose_bridge_client()
+	_dispose_observation_service()
 	_bridge_client = null
 	_capability_registry = null
 	_observation_service = null
@@ -61,8 +62,10 @@ func _on_disconnect_requested() -> void:
 
 func _start_bridge() -> void:
 	_dispose_bridge_client()
-	_capability_registry = CapabilityRegistry.new()
+	_dispose_observation_service()
 	_observation_service = ObservationService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
+	_capability_registry = CapabilityRegistry.new()
+	_append_log("info", "Observation capabilities updated.", _observation_service.get_console_capture_status())
 	_bridge_client = BridgeClient.new(
 		_build_bridge_config(),
 		_build_client_identity(),
@@ -84,6 +87,14 @@ func _dispose_bridge_client() -> void:
 	if _bridge_client.handshake_completed.is_connected(_on_handshake_completed):
 		_bridge_client.handshake_completed.disconnect(_on_handshake_completed)
 	_bridge_client.stop()
+
+
+func _dispose_observation_service() -> void:
+	if _observation_service == null:
+		return
+	if _observation_service.has_method("dispose"):
+		_observation_service.dispose()
+	_observation_service = null
 
 
 func _on_bridge_log_emitted(level: String, message: String, context: Dictionary = {}) -> void:
@@ -130,8 +141,15 @@ func _build_client_identity() -> Dictionary:
 	return _capability_registry.build_client_identity(
 		ProjectSettings.globalize_path("res://"),
 		_format_godot_version(),
-		reconnect_policy
+		reconnect_policy,
+		_build_capability_overrides()
 	)
+
+
+func _build_capability_overrides() -> Dictionary:
+	if _observation_service != null and _observation_service.has_method("get_capability_overrides"):
+		return _observation_service.get_capability_overrides()
+	return {"editor.console.capture": "disabled"}
 
 
 func _register_project_settings() -> void:

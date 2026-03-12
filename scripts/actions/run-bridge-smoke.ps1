@@ -23,6 +23,7 @@ $addonLogPath = Join-Path $mcpLogDir "addon.log"
 $serverFileLogPath = Join-Path $mcpLogDir "server.log"
 
 $serverProcess = $null
+$scanConflictState = Suspend-GodotScanConflicts -RepoRoot $RepoRoot
 try {
   $serverEnvPrefix = '$env:GODOT_LOOP_MCP_BRIDGE_ONLY=''1''; $env:GODOT_LOOP_MCP_LOG_DIR=''' + $mcpLogDir.Replace("'", "''") + '''; '
   $serverCommand = $serverEnvPrefix + "node --experimental-strip-types src/index.ts"
@@ -64,6 +65,9 @@ try {
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed."
 }
 finally {
+  if ($null -ne $scanConflictState) {
+    Resume-GodotScanConflicts -State $scanConflictState
+  }
   if ($null -ne $serverProcess -and -not $serverProcess.HasExited) {
     Stop-Process -Id $serverProcess.Id -Force
     $serverProcess.WaitForExit()

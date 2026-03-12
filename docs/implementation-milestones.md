@@ -46,7 +46,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 | Milestone | 状態 | 実装/確認内容 |
 | --- | --- | --- |
 | `M0` | 完了 | Addon skeleton, TypeScript server skeleton, `bridge.handshake.hello`, `bridge.handshake.sync`, 双方向 `bridge.ping`, capability logging, reconnect policy, ローカル手順書を追加済み |
-| `M1` | 着手 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。`get_output_logs` / `get_godot_errors` は現状 `.godot/mcp` の addon/server log を参照 |
+| `M1` | 着手 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。addon 側 error は MCP tool error に反映。smoke は legacy `addon-staging` を退避して UID duplicate warning を回避。`Godot 4.5+` では `OS.add_logger()` 由来の editor console capture、`4.4` では `.godot/mcp` fallback を返す |
 | `M2` | 未着手 | scene/script 編集と play/stop はまだ未実装 |
 | `M3` | 未着手 | 計画のみ |
 | `M4` | 未着手 | 計画のみ |
@@ -176,9 +176,10 @@ AI が Godot Editor の現在状態を安全に観測できるようにし、破
 ### 実装済み
 
 - `addons/godot_loop_mcp/observation/observation_service.gd` で `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script` を実装
+- `addons/godot_loop_mcp/observation/editor_console_capture.gd` で `Godot 4.5+` の custom logger ring buffer を実装
 - `addons/godot_loop_mcp/bridge/bridge_client.gd` に server -> addon の request dispatch を追加
 - `packages/server/src/mcp/server.ts` で stdio MCP server と read-only tools/resources を追加
-- `packages/server/src/observation/logs.ts` で `.godot/mcp/addon.log` と `.godot/mcp/server.log` の参照を追加
+- `packages/server/src/observation/logs.ts` で `editor-console-buffer` と `.godot/mcp` fallback の payload を整理
 - `packages/server/src/dev/m1Smoke.ts` と `packages/server/package.json` で `typecheck`, `smoke:m1` を追加
 - `docs/m1-local-development.md` を追加
 
@@ -192,7 +193,7 @@ AI が Godot Editor の現在状態を安全に観測できるようにし、破
 - play/stop
 - scene/script の書き換え
 - tests
-- editor console 全体の取得ではなく、現状は `.godot/mcp` の addon/server log を返す
+- `Godot 4.4` では editor console 全体の public API がないため、引き続き `.godot/mcp` fallback を返す
 
 ## M2: Edit and Play Loop MVP
 

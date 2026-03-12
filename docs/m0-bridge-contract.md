@@ -80,9 +80,12 @@ M0 では Addon が `enabled` と `planned` の両方を送って構いません
 
 - `bridge.handshake` (`enabled`)
 - `bridge.ping` (`enabled`)
-- `project.info` (`planned`)
-- `scene.read` (`planned`)
-- `script.read` (`planned`)
+- `project.info` (`enabled`)
+- `editor.state` (`enabled`)
+- `scene.read` (`enabled`)
+- `script.read` (`enabled`)
+- `logs.read` (`enabled`)
+- `editor.console.capture` (`enabled` on `Godot 4.5+`, `disabled` on `4.4`)
 - `runtime.debug` (`planned`)
 
 ## Security Levels
