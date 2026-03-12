@@ -1,10 +1,17 @@
 {
   "name": "@godot-loop-mcp/server",
-  "private": true,
+  "private": false,
   "version": "0.1.0",
-  "description": "Bridge server skeleton for godot-loop-mcp.",
+  "description": "MCP bridge server for godot-loop-mcp.",
   "license": "Apache-2.0",
   "type": "module",
+  "keywords": [
+    "godot",
+    "mcp",
+    "model-context-protocol",
+    "editor",
+    "automation"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ayutaz/godot-loop-mcp.git",
@@ -17,15 +24,24 @@
   "engines": {
     "node": ">=22.14.0"
   },
+  "bin": {
+    "godot-loop-mcp-server": "bin/godot-loop-mcp-server.js"
+  },
   "files": [
+    "bin/",
     "README.md",
     "src/",
     "tsconfig.json"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "node --experimental-strip-types src/index.ts",
     "dev": "node --experimental-strip-types --watch src/index.ts",
     "pack": "npm pack",
+    "pack:dry-run": "npm pack --dry-run",
+    "publish:dry-run": "npm publish --dry-run --access public",
     "typecheck": "tsc -p tsconfig.json",
     "smoke:m1": "node --experimental-strip-types src/dev/m1Smoke.ts",
     "smoke:m2": "node --experimental-strip-types src/dev/m2Smoke.ts",

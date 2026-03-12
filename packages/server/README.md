@@ -6,6 +6,16 @@ TypeScript bridge server for `godot-loop-mcp`.
 
 - Node.js `22.14.0+`
 
+## Install / run
+
+From a Godot project root:
+
+```powershell
+npx @godot-loop-mcp/server
+```
+
+If the current directory is not the Godot project root, set `GODOT_LOOP_MCP_REPO_ROOT`.
+
 ## Local development
 
 ```powershell
@@ -14,7 +24,14 @@ npm run typecheck
 npm run start
 ```
 
-The server uses Node's `--experimental-strip-types` support and currently ships the source `.ts` files directly.
+The published CLI uses a small JS launcher and still relies on Node's `--experimental-strip-types` support for the shipped `.ts` sources.
+
+Publishability checks:
+
+```powershell
+npm run pack:dry-run
+npm run publish:dry-run
+```
 
 For the M1 read-only observation smoke:
 
@@ -58,6 +75,7 @@ On `Godot 4.5+`, `get_output_logs` / `get_godot_errors` prefer the addon-side ed
 Security and audit notes:
 
 - `GODOT_LOOP_MCP_SECURITY_LEVEL` controls the server-side maximum level
+- `GODOT_LOOP_MCP_REPO_ROOT` overrides workspace detection when the server is not launched from a Godot project root
 - `GODOT_LOOP_MCP_ENABLE_EDITOR_SCRIPT`, `GODOT_LOOP_MCP_ALLOWED_WRITE_PREFIXES`, and `GODOT_LOOP_MCP_ALLOWED_SHELL_COMMANDS` are enforced by the addon for dangerous-mode tools
 - `.godot/mcp/audit.log` records tool/resource/prompt access with hashed arguments and duration
 - dangerous tools stay hidden unless both server and addon opt into `Dangerous`

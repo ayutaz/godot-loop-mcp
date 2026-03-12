@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { SecurityLevel } from "./transport/types.ts";
@@ -20,9 +21,9 @@ export interface ServerConfig {
 
 const sourceDir = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = path.resolve(sourceDir, "..");
-const repoRoot = path.resolve(packageRoot, "..", "..");
 
 export function loadConfig(): ServerConfig {
+  const repoRoot = resolveRepoRoot();
   return {
     host: process.env.GODOT_LOOP_MCP_HOST ?? "127.0.0.1",
     port: numberFromEnv("GODOT_LOOP_MCP_PORT", 6010),
@@ -38,6 +39,40 @@ export function loadConfig(): ServerConfig {
     bridgeOnlyMode: booleanFromEnv("GODOT_LOOP_MCP_BRIDGE_ONLY", false),
     securityLevel: securityLevelFromEnv("GODOT_LOOP_MCP_SECURITY_LEVEL", "WorkspaceWrite")
   };
+}
+
+function resolveRepoRoot(): string {
+  const explicitRoot = process.env.GODOT_LOOP_MCP_REPO_ROOT?.trim();
+  if (explicitRoot) {
+    return path.resolve(explicitRoot);
+  }
+
+  const cwdRoot = findProjectRoot(process.cwd());
+  if (cwdRoot) {
+    return cwdRoot;
+  }
+
+  const sourceLayoutRoot = findProjectRoot(path.resolve(packageRoot, "..", ".."));
+  if (sourceLayoutRoot) {
+    return sourceLayoutRoot;
+  }
+
+  return process.cwd();
+}
+
+function findProjectRoot(startDir: string): string | undefined {
+  let currentDir = path.resolve(startDir);
+  while (true) {
+    if (fs.existsSync(path.join(currentDir, "project.godot"))) {
+      return currentDir;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return undefined;
+    }
+    currentDir = parentDir;
+  }
 }
 
 function numberFromEnv(name: string, fallback: number): number {

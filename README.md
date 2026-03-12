@@ -12,12 +12,12 @@
 
 ## ステータス
 
-このリポジトリでは `M0` から `M6` の実装面が揃っており、残作業は `M5` の release hardening と publishing 設定に集約されています。
+このリポジトリでは `M0` から `M6` の実装面が揃っており、repo 内の残作業はほぼ解消されています。残っているのは npm 側の trusted publisher 登録という外部設定です。
 
 現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
 - 実装済み: addon skeleton, TypeScript server skeleton, `handshake`, 双方向 `ping`, capability manifest, reconnect policy
-- 実装済み: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, release asset 生成の足場
+- 実装済み: GitHub Actions `ci`, `nightly-compat`, `release`, reusable workflows, packaging scripts, release asset 生成
 - 実装済み: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, MCP tool error hardening
 - 実装済み: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, `smoke:m2`
 - 実装済み: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, `smoke:m3`
@@ -26,7 +26,8 @@
 - 実装済み: `M6` `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, `smoke:m6`
 - 実装済み: active addon session の capability manifest に応じて MCP tools/resources を動的公開し、未接続時は fallback log surface のみを露出
 - 実装済み: `Godot 4.5+` では `OS.add_logger()` による editor console capture、headless play output は `.godot/mcp/runtime.log` を返し、`4.4` では `.godot/mcp` fallback
-- 進行中: GitHub Actions への `run_tests` / report artifact の本格統合、release hardening、trusted publishing 設定
+- 実装済み: GitHub Actions で `run_tests` smoke と `test-reports` artifact を統合し、`packages/server` を publishable package に固定
+- 外部設定待ち: npm trusted publisher の npm 側登録
 - 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD 計画: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -53,11 +54,11 @@ npm ci --prefix packages/server
 ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot $PWD.Path -GodotBinaryPath (Get-Command godot_console.exe).Source
 ```
 
-GitHub Actions では 2026-03-12 時点で次を定義済みです。
+GitHub Actions では 2026-03-13 時点で次を定義済みです。
 
-- PR / `main`: `server-check`, `bridge-smoke`
+- PR / `main`: `server-check`, `bridge-smoke`, `verification-smoke`
 - nightly: `windows-latest`, `ubuntu-latest` x `4.4.1-stable`, `4.5.1-stable`
-- release: smoke, Addon ZIP, server tarball, `SHA256SUMS`, GitHub Release asset upload
+- release: smoke, `test-reports`, Addon ZIP, server tarball, `SHA256SUMS`, GitHub Release asset upload, manual `publish-npm`
 
 ## M1 Observation
 
@@ -139,7 +140,7 @@ security enforcement と dangerous mode の最小実装は入っています。
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: server/addon の `Dangerous` 指定に加え、write prefix / shell allowlist / editor script opt-in が必要
-- status: security enforcement と監査は実装済み。trusted publishing と release hardening は引き続き `M5` の残作業
+- status: security enforcement、監査、release workflow、publishable package 契約は実装済み。残るのは npm 側の trusted publisher 登録
 
 確認済みコマンド:
 

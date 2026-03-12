@@ -12,12 +12,12 @@ The project is intended to provide:
 
 ## Status
 
-This repository now has the implementation surface for `M0` through `M6`, and the remaining work is concentrated in `M5` release hardening and publishing setup.
+This repository now has the implementation surface for `M0` through `M6`, and the remaining repo-side work is effectively closed. The last open item is the npm-side trusted publisher registration.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
 - Implemented: addon skeleton, TypeScript server skeleton, `handshake`, bidirectional `ping`, capability manifest, reconnect policy
-- Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, and release-asset scaffolding
+- Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, reusable workflows, packaging scripts, and release assets
 - Implemented: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, and MCP tool error hardening
 - Implemented: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, and `smoke:m2`
 - Implemented: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, and `smoke:m3`
@@ -26,7 +26,8 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 - Implemented: `M6` `execute_editor_script`, `filesystem_write_raw`, `os_shell`, allowlist/opt-in gating, and `smoke:m6`
 - Implemented: capability-aware dynamic MCP tool/resource exposure; when no addon session is ready, only the fallback log surface remains visible
 - Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, headless play output via `.godot/mcp/runtime.log`, and `.godot/mcp` fallback on `4.4`
-- In progress: deeper GitHub Actions integration for `run_tests`, report artifacts, release hardening, and trusted publishing setup
+- Implemented: GitHub Actions `run_tests` smoke and `test-reports` artifacts, plus a publishable `packages/server` contract
+- External setup pending: npm-side trusted publisher registration
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -53,11 +54,11 @@ npm ci --prefix packages/server
 ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot $PWD.Path -GodotBinaryPath (Get-Command godot_console.exe).Source
 ```
 
-As of 2026-03-12, GitHub Actions defines:
+As of 2026-03-13, GitHub Actions defines:
 
-- PR / `main`: `server-check`, `bridge-smoke`
+- PR / `main`: `server-check`, `bridge-smoke`, `verification-smoke`
 - nightly: `windows-latest`, `ubuntu-latest` x `4.4.1-stable`, `4.5.1-stable`
-- release: smoke, addon ZIP, server tarball, `SHA256SUMS`, GitHub Release asset upload
+- release: smoke, `test-reports`, addon ZIP, server tarball, `SHA256SUMS`, GitHub Release asset upload, and manual `publish-npm`
 
 ## M1 Observation
 
@@ -139,7 +140,7 @@ Security enforcement and the initial dangerous mode implementation are in place.
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: both server and addon must opt into `Dangerous`, plus write prefixes / shell allowlists / editor script opt-in
-- status: security enforcement and audit are implemented. trusted publishing and release hardening remain the open `M5` tasks
+- status: security enforcement, audit, release workflows, and the publishable package contract are implemented. The remaining item is the npm-side trusted publisher registration
 
 Verified commands:
 
