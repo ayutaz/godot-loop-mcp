@@ -34,8 +34,7 @@
 
 M0 の bridge 実装は動作確認済みです。
 
-- 契約仕様: [docs/m0-bridge-contract.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m0-bridge-contract.md)
-- ローカル起動手順: [docs/m0-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m0-local-development.md)
+- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M0`
 - マイルストーン: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - Asset Library チェックリスト: [docs/asset-library-release-checklist.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/asset-library-release-checklist.md)
 
@@ -64,7 +63,7 @@ GitHub Actions では 2026-03-12 時点で次を定義済みです。
 
 M1 の read-only observation と hardening は実装済みです。
 
-- 手順: [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
+- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M1`
 - tools: `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script`, `get_output_logs`, `get_godot_errors`
 - resources: `godot://project/info`, `godot://scene/current`, `godot://scene/tree`, `godot://scripts/open`, `godot://script/current`, `godot://errors/latest`
 - logs: `Godot 4.5+` では addon ring buffer を優先し、`Godot 4.4` では `.godot/mcp` の addon/server log に fallback
@@ -81,7 +80,7 @@ npm --prefix packages/server run smoke:m1
 
 M2 の edit/play loop は実装済みです。
 
-- 手順: [docs/m2-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m2-local-development.md)
+- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M2`
 - tools: `create_scene`, `open_scene`, `save_scene`, `play_scene`, `stop_scene`, `add_node`, `move_node`, `delete_node`, `update_property`, `create_script`, `attach_script`, `clear_output_logs`
 - security level: `WorkspaceWrite`
 - headless play: editor とは別の Godot process を起動し、`.godot/mcp/runtime.log` に runtime output を保存
@@ -99,7 +98,7 @@ npm --prefix packages/server run smoke:m2
 
 M3 の search / UID / dynamic capability surface は実装済みです。
 
-- 手順: [docs/m3-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m3-local-development.md)
+- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M3`
 - tools: `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`
 - resources: `godot://selection/current`
 - dynamic catalog: addon 未接続時は `clear_output_logs`, `get_output_logs`, `get_godot_errors`, `godot://errors/latest` のみを公開し、ready session 後に capability に応じて tools/resources が増える
@@ -117,7 +116,7 @@ npm --prefix packages/server run smoke:m3
 
 M4 の verification loop hardening は実装済みです。
 
-- 手順: [docs/m4-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m4-local-development.md)
+- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M4`
 - tools: `run_tests`, `get_editor_screenshot`, `get_running_scene_screenshot`, `get_runtime_debug_events`, `clear_runtime_debug_events`
 - prompts: `godot_editor_strategy`, `godot_ui_layout_strategy`, `godot_debug_loop`, `godot_scene_edit_safety`
 - resource templates: `godot://scene/{path}`, `godot://script/{path}`, `godot://node/{scenePath}/{nodePath}`, `godot://resource/{uid}`
@@ -135,8 +134,7 @@ npm --prefix packages/server run smoke:m4
 
 security enforcement と dangerous mode の最小実装は入っています。
 
-- 手順: [docs/m5-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m5-local-development.md)
-- 手順: [docs/m6-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m6-local-development.md)
+- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M5` と `M6`
 - security levels: `ReadOnly`, `WorkspaceWrite`, `Dangerous`
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`

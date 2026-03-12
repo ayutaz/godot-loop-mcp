@@ -1,7 +1,7 @@
 # GitHub Actions CI/CD 計画
 
 作成日: 2026-03-12  
-更新日: 2026-03-12  
+更新日: 2026-03-13  
 対象リポジトリ: `godot-loop-mcp`
 
 ## 目的
@@ -26,7 +26,6 @@
 - `scripts/actions/package-addon.ps1`
 - `scripts/actions/write-sha256.ps1`
 - `packages/server/package-lock.json`
-- `docs/m5-local-development.md`
 
 現時点で残っている差分は次です。
 
@@ -43,9 +42,7 @@
 
 ローカル検証の source of truth:
 
-- `docs/m4-local-development.md`
-- `docs/m5-local-development.md`
-- `docs/m6-local-development.md`
+- `docs/implementation-milestones.md`
 
 ## マルチエージェント統合結論
 
