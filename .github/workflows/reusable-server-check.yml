@@ -1,0 +1,69 @@
+name: Reusable Server Check
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        required: false
+        default: server-bootstrap
+        type: string
+      node_version:
+        required: false
+        default: 22.14.0
+        type: string
+      retention_days:
+        required: false
+        default: 7
+        type: number
+      runner:
+        required: false
+        default: ubuntu-latest
+        type: string
+      timeout_minutes:
+        required: false
+        default: 10
+        type: number
+
+jobs:
+  server-check:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Typecheck server
+        run: npm run typecheck
+        working-directory: packages/server
+
+      - name: Package dry run
+        run: npm run pack:dry-run
+        working-directory: packages/server
+
+      - name: Publish dry run
+        run: npm run publish:dry-run
+        working-directory: packages/server
+
+      - name: Bootstrap server process
+        shell: pwsh
+        run: ./scripts/actions/run-server-bootstrap.ps1 -RepoRoot "${{ github.workspace }}" -LogDir "${{ github.workspace }}/.artifacts/server-bootstrap"
+
+      - name: Upload server bootstrap logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ github.workspace }}/.artifacts/server-bootstrap
+          if-no-files-found: warn
+          retention-days: ${{ inputs.retention_days }}

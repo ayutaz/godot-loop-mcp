@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-check:
+    uses: ./.github/workflows/reusable-server-check.yml
+    with:
+      artifact_name: server-bootstrap
+      retention_days: 7
+
+  bridge-smoke:
+    needs:
+      - server-check
+    uses: ./.github/workflows/reusable-godot-smoke.yml
+    with:
+      runner: windows-latest
+      godot_version: 4.4.1-stable
+      timeout_minutes: 15
+      artifact_name: bridge-smoke-windows
+      artifact_paths: |
+        ${{ github.workspace }}/.artifacts/bridge-smoke
+        ${{ github.workspace }}/.godot/mcp
+      smoke_command: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+      retention_days: 7
+
+  verification-smoke:
+    needs:
+      - server-check
+    uses: ./.github/workflows/reusable-godot-smoke.yml
+    with:
+      runner: windows-latest
+      godot_version: 4.5.1-stable
+      timeout_minutes: 20
+      artifact_name: verification-smoke-windows
+      artifact_paths: |
+        ${{ github.workspace }}/.godot/mcp
+      smoke_command: npm --prefix packages/server run smoke:m4
+      retention_days: 7

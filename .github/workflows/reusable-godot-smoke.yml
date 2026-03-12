@@ -1,0 +1,74 @@
+name: Reusable Godot Smoke
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        required: true
+        type: string
+      artifact_paths:
+        required: true
+        type: string
+      godot_version:
+        required: true
+        type: string
+      node_version:
+        required: false
+        default: 22.14.0
+        type: string
+      retention_days:
+        required: false
+        default: 7
+        type: number
+      runner:
+        required: true
+        type: string
+      smoke_command:
+        required: true
+        type: string
+      timeout_minutes:
+        required: false
+        default: 20
+        type: number
+
+jobs:
+  godot-smoke:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Install Godot
+        id: install_godot
+        shell: pwsh
+        run: ./scripts/actions/install-godot.ps1 -Version "${{ inputs.godot_version }}" -InstallDir "${{ github.workspace }}/.tools/godot"
+
+      - name: Export Godot binary path
+        shell: pwsh
+        run: |
+          "GODOT_LOOP_MCP_GODOT_BIN=${{ steps.install_godot.outputs.binary_path }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run Godot smoke command
+        shell: pwsh
+        run: ${{ inputs.smoke_command }}
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_paths }}
+          if-no-files-found: warn
+          retention-days: ${{ inputs.retention_days }}

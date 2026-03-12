@@ -1,0 +1,39 @@
+name: Nightly Compatibility
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-compat
+  cancel-in-progress: true
+
+jobs:
+  bridge-smoke-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            godot_version: 4.4.1-stable
+          - os: windows-latest
+            godot_version: 4.5.1-stable
+          - os: ubuntu-latest
+            godot_version: 4.4.1-stable
+          - os: ubuntu-latest
+            godot_version: 4.5.1-stable
+    uses: ./.github/workflows/reusable-godot-smoke.yml
+    with:
+      runner: ${{ matrix.os }}
+      godot_version: ${{ matrix.godot_version }}
+      timeout_minutes: 20
+      artifact_name: bridge-smoke-${{ matrix.os }}-${{ matrix.godot_version }}
+      artifact_paths: |
+        ${{ github.workspace }}/.artifacts/bridge-smoke
+        ${{ github.workspace }}/.godot/mcp
+      smoke_command: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+      retention_days: 14
