@@ -1,0 +1,64 @@
+name: Nightly Compatibility
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-compat
+  cancel-in-progress: true
+
+jobs:
+  bridge-smoke-matrix:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            godot_version: 4.4.1-stable
+          - os: windows-latest
+            godot_version: 4.5.1-stable
+          - os: ubuntu-latest
+            godot_version: 4.4.1-stable
+          - os: ubuntu-latest
+            godot_version: 4.5.1-stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Install Godot
+        id: install_godot
+        shell: pwsh
+        run: ./scripts/actions/install-godot.ps1 -Version "${{ matrix.godot_version }}" -InstallDir "${{ github.workspace }}/.tools/godot"
+
+      - name: Run bridge smoke test
+        shell: pwsh
+        run: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "${{ steps.install_godot.outputs.binary_path }}" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+
+      - name: Upload compatibility logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-smoke-${{ matrix.os }}-${{ matrix.godot_version }}
+          path: |
+            ${{ github.workspace }}/.artifacts/bridge-smoke
+            ${{ github.workspace }}/.godot/mcp
+          if-no-files-found: warn
+          retention-days: 14

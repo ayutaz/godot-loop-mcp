@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Package dry run
+        run: npm pack --dry-run
+        working-directory: packages/server
+
+      - name: Bootstrap server process
+        shell: pwsh
+        run: ./scripts/actions/run-server-bootstrap.ps1 -RepoRoot "${{ github.workspace }}" -LogDir "${{ github.workspace }}/.artifacts/server-bootstrap"
+
+      - name: Upload server bootstrap logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-bootstrap
+          path: ${{ github.workspace }}/.artifacts/server-bootstrap
+          if-no-files-found: warn
+          retention-days: 7
+
+  bridge-smoke:
+    runs-on: windows-latest
+    needs:
+      - server-check
+    timeout-minutes: 15
+    env:
+      GODOT_VERSION: 4.4.1-stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Install Godot
+        id: install_godot
+        shell: pwsh
+        run: ./scripts/actions/install-godot.ps1 -Version "${{ env.GODOT_VERSION }}" -InstallDir "${{ github.workspace }}/.tools/godot"
+
+      - name: Run bridge smoke test
+        shell: pwsh
+        run: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "${{ steps.install_godot.outputs.binary_path }}" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+
+      - name: Upload bridge smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-smoke-windows
+          path: |
+            ${{ github.workspace }}/.artifacts/bridge-smoke
+            ${{ github.workspace }}/.godot/mcp
+          if-no-files-found: warn
+          retention-days: 7

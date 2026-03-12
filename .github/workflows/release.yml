@@ -1,0 +1,239 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to package and publish.
+        required: true
+        type: string
+      publish_npm:
+        description: Publish the server package to npm when trusted publishing is configured.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+
+concurrency:
+  group: release-${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  verify-release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      GODOT_VERSION: 4.4.1-stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Install Godot
+        id: install_godot
+        shell: pwsh
+        run: ./scripts/actions/install-godot.ps1 -Version "${{ env.GODOT_VERSION }}" -InstallDir "${{ github.workspace }}/.tools/godot"
+
+      - name: Run bridge smoke test
+        shell: pwsh
+        run: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "${{ steps.install_godot.outputs.binary_path }}" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+
+      - name: Upload release smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-smoke-logs
+          path: |
+            ${{ github.workspace }}/.artifacts/bridge-smoke
+            ${{ github.workspace }}/.godot/mcp
+          if-no-files-found: warn
+          retention-days: 30
+
+  package-addon:
+    runs-on: ubuntu-latest
+    needs:
+      - verify-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package addon zip
+        id: package_addon
+        shell: pwsh
+        run: ./scripts/actions/package-addon.ps1 -RepoRoot "${{ github.workspace }}" -Version "${{ env.RELEASE_TAG }}" -OutputDir "${{ github.workspace }}/dist/release"
+
+      - name: Upload addon package
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-addon
+          path: ${{ github.workspace }}/dist/release/godot-loop-mcp-addon-*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  package-server:
+    runs-on: ubuntu-latest
+    needs:
+      - verify-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Package server tarball
+        run: |
+          New-Item -ItemType Directory -Path "${{ github.workspace }}/dist/release" -Force | Out-Null
+          $archiveName = (npm pack --pack-destination "${{ github.workspace }}/dist/release" | Select-Object -Last 1).Trim()
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($archiveName)) {
+            throw "npm pack failed."
+          }
+          $sourcePath = Join-Path "${{ github.workspace }}/dist/release" $archiveName
+          $targetPath = Join-Path "${{ github.workspace }}/dist/release" "godot-loop-mcp-server-${{ env.RELEASE_TAG }}.tgz"
+          if (Test-Path -LiteralPath $targetPath) {
+            Remove-Item -LiteralPath $targetPath -Force
+          }
+          Move-Item -LiteralPath $sourcePath -Destination $targetPath
+        shell: pwsh
+        working-directory: packages/server
+
+      - name: Upload server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-server
+          path: ${{ github.workspace }}/dist/release/*.tgz
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-github-release:
+    runs-on: ubuntu-latest
+    needs:
+      - verify-release
+      - package-addon
+      - package-server
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download addon package
+        uses: actions/download-artifact@v4
+        with:
+          name: release-addon
+          path: ${{ github.workspace }}/dist/release
+
+      - name: Download server package
+        uses: actions/download-artifact@v4
+        with:
+          name: release-server
+          path: ${{ github.workspace }}/dist/release
+
+      - name: Download smoke logs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-smoke-logs
+          path: ${{ github.workspace }}/dist/smoke-logs
+
+      - name: Archive smoke logs
+        shell: pwsh
+        run: |
+          $tag = "${{ env.RELEASE_TAG }}"
+          $archivePath = Join-Path "${{ github.workspace }}/dist/release" "smoke-logs-$tag.zip"
+          if (Test-Path -LiteralPath $archivePath) {
+            Remove-Item -LiteralPath $archivePath -Force
+          }
+          Compress-Archive -Path "${{ github.workspace }}/dist/smoke-logs/*" -DestinationPath $archivePath -Force
+
+      - name: Write SHA256SUMS
+        shell: pwsh
+        run: ./scripts/actions/write-sha256.ps1 -InputDir "${{ github.workspace }}/dist/release"
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ env.RELEASE_TAG }}"
+          $assets = Get-ChildItem -Path "${{ github.workspace }}/dist/release" -File | Sort-Object Name | ForEach-Object { $_.FullName }
+          gh --version
+          gh release view $tag *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          if ($releaseExists) {
+            gh release upload $tag @assets --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw "gh release upload failed for $tag."
+            }
+          } else {
+            gh release create $tag @assets --title $tag --generate-notes --target "${{ github.sha }}"
+            if ($LASTEXITCODE -ne 0) {
+              throw "gh release create failed for $tag."
+            }
+          }
+
+  publish-npm:
+    runs-on: ubuntu-latest
+    needs:
+      - verify-release
+      - package-server
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_npm && vars.NPM_PUBLISH_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: packages/server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: packages/server
+
+      - name: Inspect publishability
+        id: package_meta
+        shell: pwsh
+        working-directory: packages/server
+        run: |
+          $package = Get-Content package.json | ConvertFrom-Json
+          "publishable=$(-not [bool]$package.private)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          if ([bool]$package.private) {
+            Write-Host "Package publish skipped because package.json still sets private=true."
+          }
+
+      - name: Publish to npm with provenance
+        if: steps.package_meta.outputs.publishable == 'true'
+        run: npm publish --provenance --access public
+        working-directory: packages/server

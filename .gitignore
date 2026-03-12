@@ -1,6 +1,9 @@
 /.godot/
+/.artifacts/
+/.tools/
+/dist/
 /packages/server/node_modules/
 /packages/server/.npm/
 /packages/server/*.log
+/packages/server/*.tgz
 /packages/server/tsconfig.tsbuildinfo
-
