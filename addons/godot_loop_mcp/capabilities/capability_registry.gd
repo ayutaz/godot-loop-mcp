@@ -26,20 +26,32 @@ func build_manifest() -> Dictionary:
 			{
 				"id": "project.info",
 				"surface": "resource",
-				"availability": "planned",
-				"description": "Will expose project metadata in M1."
+				"availability": "enabled",
+				"description": "Exposes project metadata to MCP resources."
+			},
+			{
+				"id": "editor.state",
+				"surface": "tool",
+				"availability": "enabled",
+				"description": "Exposes the current editor state."
 			},
 			{
 				"id": "scene.read",
 				"surface": "tool",
-				"availability": "planned",
-				"description": "Will expose scene tree inspection in M1."
+				"availability": "enabled",
+				"description": "Exposes the current scene tree for read-only inspection."
 			},
 			{
 				"id": "script.read",
 				"surface": "tool",
-				"availability": "planned",
-				"description": "Will expose open script inspection in M1."
+				"availability": "enabled",
+				"description": "Exposes open script inspection in the editor."
+			},
+			{
+				"id": "logs.read",
+				"surface": "tool",
+				"availability": "enabled",
+				"description": "Exposes addon and bridge log inspection."
 			},
 			{
 				"id": "runtime.debug",
@@ -68,4 +80,3 @@ func build_client_identity(workspace_root: String, godot_version: String, reconn
 		"workspaceRoot": workspace_root,
 		"reconnectPolicy": reconnect_policy
 	}
-

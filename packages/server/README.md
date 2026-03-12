@@ -10,7 +10,15 @@ TypeScript bridge server for `godot-loop-mcp`.
 
 ```powershell
 npm ci
+npm run typecheck
 npm run start
 ```
 
 The server uses Node's `--experimental-strip-types` support and currently ships the source `.ts` files directly.
+
+For the M1 read-only observation smoke:
+
+```powershell
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm run smoke:m1
+```

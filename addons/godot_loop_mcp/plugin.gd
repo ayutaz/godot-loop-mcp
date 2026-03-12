@@ -3,6 +3,7 @@ extends EditorPlugin
 
 const BridgeClient = preload("res://addons/godot_loop_mcp/bridge/bridge_client.gd")
 const CapabilityRegistry = preload("res://addons/godot_loop_mcp/capabilities/capability_registry.gd")
+const ObservationService = preload("res://addons/godot_loop_mcp/observation/observation_service.gd")
 
 const SETTING_BRIDGE_HOST := "godot_loop_mcp/bridge/host"
 const SETTING_BRIDGE_PORT := "godot_loop_mcp/bridge/port"
@@ -19,6 +20,7 @@ const LOG_FILE_NAME := "addon.log"
 
 var _bridge_client: RefCounted
 var _capability_registry: RefCounted
+var _observation_service: RefCounted
 var _current_state := "disconnected"
 
 
@@ -40,6 +42,7 @@ func _exit_tree() -> void:
 	_dispose_bridge_client()
 	_bridge_client = null
 	_capability_registry = null
+	_observation_service = null
 
 
 func _process(delta: float) -> void:
@@ -59,7 +62,12 @@ func _on_disconnect_requested() -> void:
 func _start_bridge() -> void:
 	_dispose_bridge_client()
 	_capability_registry = CapabilityRegistry.new()
-	_bridge_client = BridgeClient.new(_build_bridge_config(), _build_client_identity())
+	_observation_service = ObservationService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
+	_bridge_client = BridgeClient.new(
+		_build_bridge_config(),
+		_build_client_identity(),
+		Callable(_observation_service, "handle_request")
+	)
 	_bridge_client.log_emitted.connect(_on_bridge_log_emitted)
 	_bridge_client.state_changed.connect(_on_bridge_state_changed)
 	_bridge_client.handshake_completed.connect(_on_handshake_completed)
@@ -214,4 +222,3 @@ func _append_log(level: String, message: String, context: Dictionary = {}) -> vo
 		line += " " + JSON.stringify(context)
 	file.store_line(line)
 	file.close()
-

@@ -3,16 +3,39 @@ import { createServer } from "node:net";
 import { loadConfig } from "./config.ts";
 import { Logger } from "./logger.ts";
 import { buildMcpCatalog } from "./mcp/catalog.ts";
+import { createMcpBridgeServer } from "./mcp/server.ts";
 import { AddonSession } from "./transport/addonSession.ts";
 
 const config = loadConfig();
 const logger = new Logger(path.join(config.logDir, "server.log"));
 const sessions = new Set<AddonSession>();
+let activeSession: AddonSession | undefined;
+const mcpServer = config.bridgeOnlyMode
+  ? undefined
+  : createMcpBridgeServer({
+      config,
+      logger,
+      getActiveSession: () => activeSession
+    });
 
 const server = createServer((socket) => {
-  const session = new AddonSession(socket, config, logger, () => {
-    sessions.delete(session);
-  });
+  const session = new AddonSession(
+    socket,
+    config,
+    logger,
+    (readySession) => {
+      activeSession = readySession;
+      logger.info("Addon session promoted to active.", {
+        sessionId: readySession.getSessionId()
+      });
+    },
+    () => {
+      sessions.delete(session);
+      if (activeSession === session) {
+        activeSession = selectLatestReadySession(sessions);
+      }
+    }
+  );
   sessions.add(session);
 });
 
@@ -26,8 +49,18 @@ server.listen(config.port, config.host, () => {
     host: config.host,
     port: config.port,
     logDir: config.logDir,
+    bridgeOnlyMode: config.bridgeOnlyMode,
     mcpCatalog: buildMcpCatalog()
   });
+  if (mcpServer) {
+    void mcpServer.connectStdio().catch((error) => {
+      logger.error("Failed to start MCP stdio transport.", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      process.exitCode = 1;
+      server.close();
+    });
+  }
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -39,8 +72,14 @@ function shutdown(signal: string): void {
     signal,
     activeSessions: sessions.size
   });
-  server.close(() => {
-    process.exit(0);
+  Promise.allSettled([mcpServer?.close() ?? Promise.resolve()]).finally(() => {
+    server.close(() => {
+      process.exit(0);
+    });
   });
 }
 
+function selectLatestReadySession(allSessions: Iterable<AddonSession>): AddonSession | undefined {
+  const readySessions = Array.from(allSessions).filter((session) => session.isReady());
+  return readySessions.at(-1);
+}

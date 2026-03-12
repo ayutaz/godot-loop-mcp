@@ -26,6 +26,9 @@ import type {
 interface PendingRequest {
   method: string;
   sentAtMs: number;
+  resolve?: (result: unknown) => void;
+  reject?: (error: Error) => void;
+  timeout?: NodeJS.Timeout;
 }
 
 export class AddonSession {
@@ -36,25 +39,31 @@ export class AddonSession {
   private readonly socket: Socket;
   private readonly config: ServerConfig;
   private readonly logger: Logger;
+  private readonly onReady: (session: AddonSession) => void;
   private readonly onClose: () => void;
   private heartbeatInterval?: NodeJS.Timeout;
   private lastSeenAt = Date.now();
   private ready = false;
   private closed = false;
   private addonHello?: PeerHelloPayload;
+  private requestCounter = 0;
 
   constructor(
     socket: Socket,
     config: ServerConfig,
     logger: Logger,
+    onReady: (session: AddonSession) => void,
     onClose: () => void
   ) {
     this.socket = socket;
     this.config = config;
     this.logger = logger;
+    this.onReady = onReady;
     this.onClose = onClose;
     this.socket.setNoDelay(true);
-    this.socket.on("data", (chunk) => this.handleData(chunk));
+    this.socket.on("data", (chunk) =>
+      this.handleData(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    );
     this.socket.on("error", (error) => {
       this.logger.error("Addon socket error.", {
         sessionId: this.sessionId,
@@ -70,6 +79,41 @@ export class AddonSession {
       sessionId: this.sessionId,
       remoteAddress: this.socket.remoteAddress,
       remotePort: this.socket.remotePort
+    });
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  isReady(): boolean {
+    return this.ready && !this.closed;
+  }
+
+  getAddonHello(): PeerHelloPayload | undefined {
+    return this.addonHello;
+  }
+
+  request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+    if (!this.isReady()) {
+      return Promise.reject(new Error("Addon session is not ready."));
+    }
+
+    const request = makeRequest(method, params, this.nextRequestId());
+    return new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(request.id);
+        reject(new Error(`Addon request timed out: ${method}`));
+      }, this.config.requestTimeoutMs);
+
+      this.pendingRequests.set(request.id, {
+        method,
+        sentAtMs: Date.now(),
+        resolve: (result) => resolve(result as T),
+        reject,
+        timeout
+      });
+      this.send(request);
     });
   }
 
@@ -142,7 +186,7 @@ export class AddonSession {
       return;
     }
 
-    this.addonHello = message.params as PeerHelloPayload;
+    this.addonHello = message.params as unknown as PeerHelloPayload;
     const reconnectPolicy = {
       initialDelayMs: this.config.reconnectInitialDelayMs,
       maxDelayMs: this.config.reconnectMaxDelayMs,
@@ -179,7 +223,9 @@ export class AddonSession {
   }
 
   private handlePing(message: BridgeRequest): void {
-    const params = isObject(message.params) ? (message.params as PingParams) : undefined;
+    const params = isObject(message.params)
+      ? (message.params as unknown as PingParams)
+      : undefined;
     this.send(
       makeResponse(message.id, {
         nonce: params?.nonce ?? "",
@@ -197,7 +243,21 @@ export class AddonSession {
     }
 
     this.pendingRequests.delete(message.id);
+    if (pending.timeout) {
+      clearTimeout(pending.timeout);
+    }
     if (message.error) {
+      if (pending.reject) {
+        pending.reject(
+          new Error(
+            `${pending.method}: ${message.error.message}${
+              message.error.data ? ` ${JSON.stringify(message.error.data)}` : ""
+            }`
+          )
+        );
+        return;
+      }
+
       this.logger.warn("Addon returned bridge error.", {
         sessionId: this.sessionId,
         method: pending.method,
@@ -213,6 +273,7 @@ export class AddonSession {
         sessionId: this.sessionId,
         result: message.result
       });
+      this.onReady(this);
       this.startHeartbeat();
       return;
     }
@@ -222,6 +283,11 @@ export class AddonSession {
         sessionId: this.sessionId,
         rttMs: Date.now() - pending.sentAtMs
       });
+      return;
+    }
+
+    if (pending.resolve) {
+      pending.resolve(message.result);
     }
   }
 
@@ -291,6 +357,12 @@ export class AddonSession {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
+    for (const pending of this.pendingRequests.values()) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
+      pending.reject?.(new Error(`Addon session closed while waiting for ${pending.method}.`));
+    }
     this.pendingRequests.clear();
     this.logger.info("Addon session closed.", {
       sessionId: this.sessionId,
@@ -298,5 +370,10 @@ export class AddonSession {
       reason
     });
     this.onClose();
+  }
+
+  private nextRequestId(): string {
+    this.requestCounter += 1;
+    return `server-${this.requestCounter}`;
   }
 }

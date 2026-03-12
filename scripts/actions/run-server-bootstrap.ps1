@@ -12,7 +12,8 @@ Ensure-EmptyDirectory -Path $LogDir
 $stdoutPath = Join-Path $LogDir "server-stdout.log"
 $stderrPath = Join-Path $LogDir "server-stderr.log"
 $serverWorkdir = Join-Path $RepoRoot "packages/server"
-$serverCommand = "node --experimental-strip-types src/index.ts"
+$serverEnvPrefix = '$env:GODOT_LOOP_MCP_BRIDGE_ONLY=''1''; $env:GODOT_LOOP_MCP_LOG_DIR=''' + $LogDir.Replace("'", "''") + '''; '
+$serverCommand = $serverEnvPrefix + "node --experimental-strip-types src/index.ts"
 
 $process = $null
 try {
@@ -22,8 +23,7 @@ try {
     -RedirectStandardOutput $stdoutPath `
     -RedirectStandardError $stderrPath `
     -PassThru
-
-  Wait-FileContainsString -Path $stdoutPath -Needle "bridge server listening." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $stderrPath -Needle "bridge server listening." -TimeoutSeconds 20
 }
 finally {
   if ($null -ne $process -and -not $process.HasExited) {

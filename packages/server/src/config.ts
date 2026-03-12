@@ -7,11 +7,13 @@ export interface ServerConfig {
   heartbeatIntervalMs: number;
   connectTimeoutMs: number;
   handshakeTimeoutMs: number;
+  requestTimeoutMs: number;
   idleTimeoutMs: number;
   reconnectInitialDelayMs: number;
   reconnectMaxDelayMs: number;
   repoRoot: string;
   logDir: string;
+  bridgeOnlyMode: boolean;
 }
 
 const sourceDir = fileURLToPath(new URL(".", import.meta.url));
@@ -25,11 +27,13 @@ export function loadConfig(): ServerConfig {
     heartbeatIntervalMs: numberFromEnv("GODOT_LOOP_MCP_HEARTBEAT_MS", 15_000),
     connectTimeoutMs: numberFromEnv("GODOT_LOOP_MCP_CONNECT_TIMEOUT_MS", 5_000),
     handshakeTimeoutMs: numberFromEnv("GODOT_LOOP_MCP_HANDSHAKE_TIMEOUT_MS", 5_000),
+    requestTimeoutMs: numberFromEnv("GODOT_LOOP_MCP_REQUEST_TIMEOUT_MS", 10_000),
     idleTimeoutMs: numberFromEnv("GODOT_LOOP_MCP_IDLE_TIMEOUT_MS", 30_000),
     reconnectInitialDelayMs: numberFromEnv("GODOT_LOOP_MCP_RECONNECT_INITIAL_DELAY_MS", 2_000),
     reconnectMaxDelayMs: numberFromEnv("GODOT_LOOP_MCP_RECONNECT_MAX_DELAY_MS", 10_000),
     repoRoot,
-    logDir: process.env.GODOT_LOOP_MCP_LOG_DIR ?? path.join(repoRoot, ".godot", "mcp")
+    logDir: process.env.GODOT_LOOP_MCP_LOG_DIR ?? path.join(repoRoot, ".godot", "mcp"),
+    bridgeOnlyMode: booleanFromEnv("GODOT_LOOP_MCP_BRIDGE_ONLY", false)
   };
 }
 
@@ -43,3 +47,11 @@ function numberFromEnv(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function booleanFromEnv(name: string, fallback: boolean): boolean {
+  const rawValue = process.env[name];
+  if (!rawValue) {
+    return fallback;
+  }
+
+  return rawValue === "1" || rawValue.toLowerCase() === "true";
+}

@@ -30,14 +30,14 @@ export function buildServerCapabilityManifest(): CapabilityManifest {
       {
         id: "mcp.tools",
         surface: "tool",
-        availability: "planned",
-        description: "MCP tool exposure starts in M1."
+        availability: "enabled",
+        description: "Read-only MCP tool exposure is enabled."
       },
       {
         id: "mcp.resources",
         surface: "resource",
-        availability: "planned",
-        description: "Core Godot resources start in M1."
+        availability: "enabled",
+        description: "Core Godot resources are exposed in M1."
       }
     ]
   };

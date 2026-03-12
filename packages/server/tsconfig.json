@@ -5,11 +5,14 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/**/*.ts"
   ]
 }
-

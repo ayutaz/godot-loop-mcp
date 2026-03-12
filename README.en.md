@@ -18,7 +18,8 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 
 - Implemented: addon skeleton, TypeScript server skeleton, `handshake`, bidirectional `ping`, capability manifest, reconnect policy
 - Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, and release-asset scaffolding
-- Next target: `M1` read-only observation tools/resources
+- Implemented: `M1` core read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`
+- Next target: `M1` hardening and the `M2` edit/play loop
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -51,6 +52,22 @@ As of 2026-03-12, GitHub Actions defines:
 - PR / `main`: `server-check`, `bridge-smoke`
 - nightly: `windows-latest`, `ubuntu-latest` x `4.4.1-stable`, `4.5.1-stable`
 - release: smoke, addon ZIP, server tarball, `SHA256SUMS`, GitHub Release asset upload
+
+## M1 Observation
+
+The core M1 read-only observation surface is now implemented.
+
+- Guide: [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
+- tools: `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script`, `get_output_logs`, `get_godot_errors`
+- resources: `godot://project/info`, `godot://scene/current`, `godot://scene/tree`, `godot://scripts/open`, `godot://script/current`, `godot://errors/latest`
+
+Verified commands:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m1
+```
 
 ## License
 

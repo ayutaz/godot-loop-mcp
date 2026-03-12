@@ -15,6 +15,7 @@ const STATE_RECONNECT_WAIT := "reconnect_wait"
 
 var _config: Dictionary
 var _client_identity: Dictionary
+var _request_handler: Callable
 var _tcp := StreamPeerTCP.new()
 var _incoming_buffer := PackedByteArray()
 var _desired_running := false
@@ -29,9 +30,10 @@ var _pending_requests: Dictionary = {}
 var _server_identity: Dictionary = {}
 
 
-func _init(config: Dictionary = {}, client_identity: Dictionary = {}) -> void:
+func _init(config: Dictionary = {}, client_identity: Dictionary = {}, request_handler: Callable = Callable()) -> void:
 	_config = config.duplicate(true)
 	_client_identity = client_identity.duplicate(true)
+	_request_handler = request_handler
 
 
 func start() -> void:
@@ -171,6 +173,20 @@ func _handle_request(message: Dictionary) -> void:
 				}
 			)
 		_:
+			if _request_handler.is_valid():
+				var outcome = _request_handler.call(method, params)
+				if typeof(outcome) == TYPE_DICTIONARY and bool(outcome.get("handled", false)):
+					if outcome.has("error"):
+						var error_payload: Dictionary = outcome.get("error", {})
+						_send_error(
+							request_id,
+							int(error_payload.get("code", -32603)),
+							str(error_payload.get("message", "Unhandled addon request error.")),
+							error_payload.get("data", null)
+						)
+					else:
+						_send_response(request_id, outcome.get("result", {}))
+					return
 			_send_error(request_id, -32601, "Method not found.", {"method": method})
 
 

@@ -24,7 +24,7 @@ $serverFileLogPath = Join-Path $mcpLogDir "server.log"
 
 $serverProcess = $null
 try {
-  $serverEnvPrefix = '$env:GODOT_LOOP_MCP_LOG_DIR=''' + $mcpLogDir.Replace("'", "''") + '''; '
+  $serverEnvPrefix = '$env:GODOT_LOOP_MCP_BRIDGE_ONLY=''1''; $env:GODOT_LOOP_MCP_LOG_DIR=''' + $mcpLogDir.Replace("'", "''") + '''; '
   $serverCommand = $serverEnvPrefix + "node --experimental-strip-types src/index.ts"
   $serverProcess = Start-Process -FilePath "pwsh" `
     -ArgumentList @("-NoLogo", "-NoProfile", "-Command", $serverCommand) `
@@ -33,7 +33,7 @@ try {
     -RedirectStandardError $serverStderrPath `
     -PassThru
 
-  Wait-FileContainsString -Path $serverStdoutPath -Needle "bridge server listening." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverStderrPath -Needle "bridge server listening." -TimeoutSeconds 20
 
   $godotArguments = @(
     "--headless",
@@ -57,8 +57,8 @@ try {
 
   Wait-FileContainsString -Path $addonLogPath -Needle "Bridge handshake completed." -TimeoutSeconds 20
   Wait-FileContainsString -Path $addonLogPath -Needle "Ping acknowledged." -TimeoutSeconds 20
-  Wait-FileContainsString -Path $serverStdoutPath -Needle "Addon hello accepted." -TimeoutSeconds 20
-  Wait-FileContainsString -Path $serverStdoutPath -Needle "Addon handshake completed." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverStderrPath -Needle "Addon hello accepted." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverStderrPath -Needle "Addon handshake completed." -TimeoutSeconds 20
 
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted."
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed."

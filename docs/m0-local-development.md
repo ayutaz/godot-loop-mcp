@@ -51,9 +51,9 @@ godot.exe --path .
 
 server 側:
 
-- server stdout または `.godot/mcp/server.log` に `Addon hello accepted.`
-- server stdout または `.godot/mcp/server.log` に `Addon capability registered.`
-- server stdout または `.godot/mcp/server.log` に `Addon handshake completed.`
+- server stderr または `.godot/mcp/server.log` に `Addon hello accepted.`
+- server stderr または `.godot/mcp/server.log` に `Addon capability registered.`
+- server stderr または `.godot/mcp/server.log` に `Addon handshake completed.`
 
 addon 側:
 
@@ -100,6 +100,12 @@ Editor の `Project > Tools` メニューに次を追加しています。
 - headless 実行時に Windows 環境で証明書ストア警告が出ることがありますが、bridge 成否とは別です
 - headless 実行環境によっては editor settings 保存エラーが出ることがありますが、M0 の handshake/ping 確認自体は可能です
 - `scripts/actions/install-godot.ps1` は現時点で `4.4.1-stable` と `4.5.1-stable` の取得を確認済みです
+
+## 10. M1 以降の確認
+
+M1 の read-only observation は別手順に切り出しています。
+
+- [docs/m1-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m1-local-development.md)
 
 ## 9. M0 の範囲
 

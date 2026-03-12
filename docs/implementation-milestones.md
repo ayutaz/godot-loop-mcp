@@ -46,7 +46,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 | Milestone | 状態 | 実装/確認内容 |
 | --- | --- | --- |
 | `M0` | 完了 | Addon skeleton, TypeScript server skeleton, `bridge.handshake.hello`, `bridge.handshake.sync`, 双方向 `bridge.ping`, capability logging, reconnect policy, ローカル手順書を追加済み |
-| `M1` | 未着手 | 観測系 tools/resources はまだ未実装 |
+| `M1` | 着手 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。`get_output_logs` / `get_godot_errors` は現状 `.godot/mcp` の addon/server log を参照 |
 | `M2` | 未着手 | scene/script 編集と play/stop はまだ未実装 |
 | `M3` | 未着手 | 計画のみ |
 | `M4` | 未着手 | 計画のみ |
@@ -63,11 +63,14 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 - `scripts/actions/run-server-bootstrap.ps1`
 - `scripts/actions/run-bridge-smoke.ps1`
 - `scripts/actions/install-godot.ps1` で `4.4.1-stable`, `4.5.1-stable` の取得を確認
+- `npm --prefix packages/server run typecheck`
+- `npm --prefix packages/server run smoke:m1`
 
 CI/CD 詳細計画:
 
 - `docs/github-actions-cicd-plan.md`
 - `docs/asset-library-release-checklist.md`
+- `docs/m1-local-development.md`
 
 ## サマリー
 
@@ -170,11 +173,26 @@ AI が Godot Editor の現在状態を安全に観測できるようにし、破
 - 大きい出力は paging か file fallback のどちらかで扱える
 - `ReadOnly` レベルで書き込み系 tool が露出しない
 
+### 実装済み
+
+- `addons/godot_loop_mcp/observation/observation_service.gd` で `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script` を実装
+- `addons/godot_loop_mcp/bridge/bridge_client.gd` に server -> addon の request dispatch を追加
+- `packages/server/src/mcp/server.ts` で stdio MCP server と read-only tools/resources を追加
+- `packages/server/src/observation/logs.ts` で `.godot/mcp/addon.log` と `.godot/mcp/server.log` の参照を追加
+- `packages/server/src/dev/m1Smoke.ts` と `packages/server/package.json` で `typecheck`, `smoke:m1` を追加
+- `docs/m1-local-development.md` を追加
+
+### 検証済み
+
+- `npm --prefix packages/server run typecheck`
+- `$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source; npm --prefix packages/server run smoke:m1`
+
 ### 後回し項目
 
 - play/stop
 - scene/script の書き換え
 - tests
+- editor console 全体の取得ではなく、現状は `.godot/mcp` の addon/server log を返す
 
 ## M2: Edit and Play Loop MVP
 

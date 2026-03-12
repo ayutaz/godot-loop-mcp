@@ -31,7 +31,7 @@ export class FrameDecoder {
         throw new Error("Bridge frame must decode to a JSON object.");
       }
 
-      messages.push(parsed as BridgeMessage);
+      messages.push(parsed as unknown as BridgeMessage);
       this.buffer = this.buffer.subarray(4 + payloadLength);
     }
 
@@ -50,7 +50,11 @@ export function encodeMessage(message: BridgeMessage): Buffer {
   return Buffer.concat([header, payload]);
 }
 
-export function makeRequest(method: string, params: unknown = {}, id = randomUUID()): BridgeRequest {
+export function makeRequest(
+  method: string,
+  params: unknown = {},
+  id: string = randomUUID()
+): BridgeRequest {
   return {
     jsonrpc: "2.0",
     id,
@@ -86,4 +90,3 @@ export function isResponse(message: BridgeMessage): message is BridgeResponse {
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
