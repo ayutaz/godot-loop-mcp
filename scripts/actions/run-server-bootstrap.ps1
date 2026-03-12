@@ -12,13 +12,15 @@ Ensure-EmptyDirectory -Path $LogDir
 $stdoutPath = Join-Path $LogDir "server-stdout.log"
 $stderrPath = Join-Path $LogDir "server-stderr.log"
 $serverWorkdir = Join-Path $RepoRoot "packages/server"
-$serverEnvPrefix = '$env:GODOT_LOOP_MCP_BRIDGE_ONLY=''1''; $env:GODOT_LOOP_MCP_LOG_DIR=''' + $LogDir.Replace("'", "''") + '''; '
-$serverCommand = $serverEnvPrefix + "node --experimental-strip-types src/index.ts"
+$originalBridgeOnly = $env:GODOT_LOOP_MCP_BRIDGE_ONLY
+$originalLogDir = $env:GODOT_LOOP_MCP_LOG_DIR
+$env:GODOT_LOOP_MCP_BRIDGE_ONLY = "1"
+$env:GODOT_LOOP_MCP_LOG_DIR = $LogDir
 
 $process = $null
 try {
-  $process = Start-Process -FilePath "pwsh" `
-    -ArgumentList @("-NoLogo", "-NoProfile", "-Command", $serverCommand) `
+  $process = Start-Process -FilePath "node" `
+    -ArgumentList @("--experimental-strip-types", "src/index.ts") `
     -WorkingDirectory $serverWorkdir `
     -RedirectStandardOutput $stdoutPath `
     -RedirectStandardError $stderrPath `
@@ -27,7 +29,26 @@ try {
 }
 finally {
   if ($null -ne $process -and -not $process.HasExited) {
-    Stop-Process -Id $process.Id -Force
-    $process.WaitForExit()
+    try {
+      Stop-Process -Id $process.Id -Force -ErrorAction Stop
+    }
+    catch {
+      if (-not $process.HasExited) {
+        $process.Kill($true)
+      }
+    }
+    [void]$process.WaitForExit(5000)
+  }
+  if ($null -eq $originalBridgeOnly) {
+    Remove-Item Env:GODOT_LOOP_MCP_BRIDGE_ONLY -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:GODOT_LOOP_MCP_BRIDGE_ONLY = $originalBridgeOnly
+  }
+  if ($null -eq $originalLogDir) {
+    Remove-Item Env:GODOT_LOOP_MCP_LOG_DIR -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:GODOT_LOOP_MCP_LOG_DIR = $originalLogDir
   }
 }
