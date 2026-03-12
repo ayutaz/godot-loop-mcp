@@ -1,25 +1,28 @@
 # godot-loop-mcp
 
-`godot-loop-mcp` is an MCP-oriented development loop for Godot 4.4+.
+[English README](README.en.md)
 
-The project aims to provide:
+`godot-loop-mcp` は Godot 4.4+ 向けの MCP ベース開発ループです。
 
-- a Godot Editor addon for live editor/runtime introspection
-- an external MCP server for tools, resources, and prompts
-- a tight AI development loop for inspect -> edit -> run -> verify workflows
+このプロジェクトでは、次の構成を目指します。
 
-## Status
+- Godot Editor Addon による editor / runtime のライブ観測
+- tools / resources / prompts を提供する外部 MCP Server
+- inspect -> edit -> run -> verify を回せる AI 開発ループ
 
-This repository is in the bootstrap phase.
+## ステータス
 
-The initial target is Godot 4.4+ with a design inspired by Unity's uLoopMCP:
+このリポジトリは立ち上げ初期段階です。
 
-- editor-aware scene and script inspection
-- runtime error and log collection
-- play/stop control
-- project and resource search
-- safe, staged automation capabilities
+最初のターゲットは、Unity の uLoopMCP に着想を得た Godot 4.4+ 向けの構成です。
 
-## License
+- Scene / Script の editor-aware な観測
+- runtime error / log の取得
+- play / stop 制御
+- project / resource 検索
+- 段階的に安全性を管理した自動化機能
 
-This project is licensed under the Apache License, Version 2.0.
+## ライセンス
+
+このプロジェクトは Apache License 2.0 で公開します。  
+Copyright 2026 ayutaz.
