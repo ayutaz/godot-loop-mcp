@@ -1,4 +1,4 @@
-import { buildMcpCatalog } from "../mcp/catalog.ts";
+import { buildMcpCatalog, type CapabilityLookup } from "../mcp/catalog.ts";
 import type {
   CapabilityManifest,
   PeerHelloPayload,
@@ -31,13 +31,13 @@ export function buildServerCapabilityManifest(): CapabilityManifest {
         id: "mcp.tools",
         surface: "tool",
         availability: "enabled",
-        description: "WorkspaceWrite MCP tool exposure is enabled."
+        description: "WorkspaceWrite MCP tool exposure is enabled and filtered by addon capabilities."
       },
       {
         id: "mcp.resources",
         surface: "resource",
         availability: "enabled",
-        description: "Core Godot resources are exposed for the current editor workspace."
+        description: "Core Godot resources are exposed dynamically for the current editor workspace."
       }
     ]
   };
@@ -48,7 +48,9 @@ export function buildServerHello(input: {
   repoRoot: string;
   heartbeatIntervalMs: number;
   reconnectPolicy: ReconnectPolicy;
+  addonCapabilities?: CapabilityManifest;
 }): PeerHelloPayload {
+  const capabilityLookup = createCapabilityLookup(input.addonCapabilities);
   return {
     sessionId: input.sessionId,
     protocolVersion: PROTOCOL_VERSION,
@@ -64,6 +66,25 @@ export function buildServerHello(input: {
     bridge: {
       heartbeatIntervalMs: input.heartbeatIntervalMs
     },
-    mcp: buildMcpCatalog()
+    mcp: buildMcpCatalog({ capabilities: capabilityLookup })
+  };
+}
+
+function createCapabilityLookup(
+  manifest?: CapabilityManifest
+): CapabilityLookup | undefined {
+  if (!manifest) {
+    return undefined;
+  }
+
+  const enabledCapabilities = new Set(
+    manifest.capabilities
+      .filter((capability) => capability.availability === "enabled")
+      .map((capability) => capability.id)
+  );
+  return {
+    hasCapability(capabilityId: string): boolean {
+      return enabledCapabilities.has(capabilityId);
+    }
   };
 }

@@ -25,6 +25,7 @@ const server = createServer((socket) => {
     logger,
     (readySession) => {
       activeSession = readySession;
+      mcpServer?.syncCatalogSession(activeSession);
       logger.info("Addon session promoted to active.", {
         sessionId: readySession.getSessionId()
       });
@@ -34,6 +35,7 @@ const server = createServer((socket) => {
       if (activeSession === session) {
         activeSession = selectLatestReadySession(sessions);
       }
+      mcpServer?.syncCatalogSession(activeSession);
     }
   );
   sessions.add(session);

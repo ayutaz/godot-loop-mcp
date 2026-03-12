@@ -12,7 +12,7 @@
 
 ## ステータス
 
-このリポジトリは立ち上げ初期段階ですが、`M0` から `M2` は完了し、`M5` の CI/CD 基盤にも着手済みです。
+このリポジトリは立ち上げ初期段階ですが、`M0` から `M3` は完了し、`M5` の CI/CD 基盤にも着手済みです。
 
 現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
@@ -20,8 +20,10 @@
 - 実装済み: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, release asset 生成の足場
 - 実装済み: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, MCP tool error hardening
 - 実装済み: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, `smoke:m2`
+- 実装済み: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, `smoke:m3`
+- 実装済み: active addon session の capability manifest に応じて MCP tools/resources を動的公開し、未接続時は fallback log surface のみを露出
 - 実装済み: `Godot 4.5+` では `OS.add_logger()` による editor console capture、headless play output は `.godot/mcp/runtime.log` を返し、`4.4` では `.godot/mcp` fallback
-- 次の対象: `M3` の search / UID / dynamic capabilities
+- 次の対象: `M4` の tests / screenshot / telemetry
 - 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD 計画: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -88,6 +90,24 @@ M2 の edit/play loop は実装済みです。
 npm --prefix packages/server run typecheck
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm --prefix packages/server run smoke:m2
+```
+
+## M3 Search/UID
+
+M3 の search / UID / dynamic capability surface は実装済みです。
+
+- 手順: [docs/m3-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m3-local-development.md)
+- tools: `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`
+- resources: `godot://selection/current`
+- dynamic catalog: addon 未接続時は `clear_output_logs`, `get_output_logs`, `get_godot_errors`, `godot://errors/latest` のみを公開し、ready session 後に capability に応じて tools/resources が増える
+- search modes: `path`, `type`, `text`
+
+確認済みコマンド:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m3
 ```
 
 ## ライセンス

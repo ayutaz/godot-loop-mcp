@@ -141,6 +141,12 @@ async function waitForProjectInfo(client: Client, timeoutMs: number): Promise<Re
   let lastReason = "Addon session did not become ready.";
 
   while (Date.now() < deadline) {
+    const tools = await client.listTools();
+    if (!tools.tools.some((tool) => tool.name === "get_project_info")) {
+      await delay(500);
+      continue;
+    }
+
     const result = await callToolJson(client, "get_project_info", undefined, { allowToolError: true });
     if (!result.isError) {
       return result.payload;

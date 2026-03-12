@@ -12,7 +12,7 @@ The project is intended to provide:
 
 ## Status
 
-This repository is still in the bootstrap phase, but `M0` through `M2` are complete and `M5` CI/CD groundwork is in progress.
+This repository is still in the bootstrap phase, but `M0` through `M3` are complete and `M5` CI/CD groundwork is in progress.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
@@ -20,8 +20,10 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 - Implemented: GitHub Actions `ci`, `nightly-compat`, `release`, packaging scripts, and release-asset scaffolding
 - Implemented: `M1` read-only observation tools/resources, stdio MCP server, `typecheck`, `smoke:m1`, and MCP tool error hardening
 - Implemented: `M2` scene/node/script write tools, `play_scene` / `stop_scene`, `clear_output_logs`, and `smoke:m2`
+- Implemented: `M3` `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, and `smoke:m3`
+- Implemented: capability-aware dynamic MCP tool/resource exposure; when no addon session is ready, only the fallback log surface remains visible
 - Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, headless play output via `.godot/mcp/runtime.log`, and `.godot/mcp` fallback on `4.4`
-- Next target: `M3` search / UID / dynamic capabilities
+- Next target: `M4` tests / screenshot / telemetry
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -88,6 +90,24 @@ Verified commands:
 npm --prefix packages/server run typecheck
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
 npm --prefix packages/server run smoke:m2
+```
+
+## M3 Search/UID
+
+The M3 search / UID / dynamic capability surface is now implemented.
+
+- Guide: [docs/m3-local-development.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/m3-local-development.md)
+- tools: `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`
+- resources: `godot://selection/current`
+- dynamic catalog: before the addon session becomes ready, only `clear_output_logs`, `get_output_logs`, `get_godot_errors`, and `godot://errors/latest` remain exposed; after handshake, tools/resources expand based on enabled capabilities
+- search modes: `path`, `type`, `text`
+
+Verified commands:
+
+```powershell
+npm --prefix packages/server run typecheck
+$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
+npm --prefix packages/server run smoke:m3
 ```
 
 ## License

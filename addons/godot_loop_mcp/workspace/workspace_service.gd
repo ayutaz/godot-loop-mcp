@@ -586,8 +586,37 @@ func _ensure_parent_dir(resource_path: String) -> int:
 
 func _notify_filesystem_file_changed(resource_path: String) -> void:
 	var filesystem := _editor_interface.get_resource_filesystem()
-	if filesystem != null:
-		filesystem.update_file(resource_path)
+	if filesystem == null:
+		return
+
+	var directory_path := resource_path.get_base_dir()
+	var directory = filesystem.get_filesystem_path(directory_path)
+	if directory == null:
+		_rescan_filesystem(filesystem)
+		return
+
+	filesystem.update_file(resource_path)
+	if not _filesystem_directory_contains_file(directory, resource_path):
+		_rescan_filesystem(filesystem)
+
+
+func _filesystem_directory_contains_file(directory, resource_path: String) -> bool:
+	if directory == null:
+		return false
+
+	for file_index in range(directory.get_file_count()):
+		if str(directory.get_file_path(file_index)) == resource_path:
+			return true
+	return false
+
+
+func _rescan_filesystem(filesystem) -> void:
+	if filesystem == null:
+		return
+	if filesystem.has_method("scan_sources"):
+		filesystem.scan_sources()
+	elif filesystem.has_method("scan"):
+		filesystem.scan()
 
 
 func _play_scene_external(requested_path: String) -> Dictionary:

@@ -205,7 +205,8 @@ export class AddonSession {
       sessionId: this.sessionId,
       repoRoot: this.config.repoRoot,
       heartbeatIntervalMs: this.config.heartbeatIntervalMs,
-      reconnectPolicy
+      reconnectPolicy,
+      addonCapabilities: this.addonHello.capabilities
     });
 
     this.send(makeResponse(message.id, serverHello));

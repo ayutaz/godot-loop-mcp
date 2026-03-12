@@ -37,7 +37,8 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 - `play_scene` / `stop_scene` を実行できる
 - 実行結果の logs/errors を再取得できる
 
-`M3` 以降は MVP 拡張として扱います。
+`M3` 以降は MVP 拡張として扱います。  
+2026-03-12 時点では `M3` まで実装済みで、次の主要対象は `M4` です。
 
 ## 現在の実装状況
 
@@ -48,7 +49,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 | `M0` | 完了 | Addon skeleton, TypeScript server skeleton, `bridge.handshake.hello`, `bridge.handshake.sync`, 双方向 `bridge.ping`, capability logging, reconnect policy, ローカル手順書を追加済み |
 | `M1` | 完了 | stdio MCP server, read-only observation tools/resources, `typecheck`, `smoke:m1` を追加。addon 側 error は MCP tool error に反映。smoke は legacy `addon-staging` を退避して UID duplicate warning を回避。`Godot 4.5+` では `OS.add_logger()` 由来の editor console capture、`4.4` では `.godot/mcp` fallback を返す |
 | `M2` | 完了 | `WorkspaceWrite` manifest, scene/node/script write tools, `play_scene` / `stop_scene`, headless external runtime launch, `.godot/mcp/runtime.log`, `smoke:m2` を追加 |
-| `M3` | 未着手 | 計画のみ |
+| `M3` | 完了 | `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`, capability-aware dynamic tool/resource exposure, `smoke:m3` を追加 |
 | `M4` | 未着手 | 計画のみ |
 | `M5` | 着手 | `.github/workflows/ci.yml`, `nightly-compat.yml`, `release.yml`, packaging scripts, `packages/server/package-lock.json`, Asset Library checklist を追加 |
 | `M6` | 未着手 | 計画のみ |
@@ -66,6 +67,7 @@ MVP 完了は `M0` から `M2` の終了時点とします。
 - `npm --prefix packages/server run typecheck`
 - `npm --prefix packages/server run smoke:m1`
 - `npm --prefix packages/server run smoke:m2`
+- `npm --prefix packages/server run smoke:m3`
 - `scripts/actions/run-bridge-smoke.ps1` を hardening 後の plugin lifecycle で再確認
 
 CI/CD 詳細計画:
@@ -74,6 +76,7 @@ CI/CD 詳細計画:
 - `docs/asset-library-release-checklist.md`
 - `docs/m1-local-development.md`
 - `docs/m2-local-development.md`
+- `docs/m3-local-development.md`
 
 ## サマリー
 
@@ -292,10 +295,28 @@ AI が project 全体を見失いにくいようにし、capability ベースの
 - resources 一覧が capability に応じて変化する
 - AI が scene path と uid の両方で資産を追跡できる
 
+### 実装済み
+
+- `addons/godot_loop_mcp/project/project_service.gd` で `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node` を実装
+- `addons/godot_loop_mcp/capabilities/capability_registry.gd` に `project.search`, `resource.uid`, `resource.resave`, `editor.selection.read`, `editor.selection.write`, `editor.focus` を追加
+- `addons/godot_loop_mcp/plugin.gd` で project service dispatch と capability override merge を追加
+- `packages/server/src/mcp/catalog.ts` で capability-aware catalog を定義し、ready session がない間は fallback log surface のみを公開
+- `packages/server/src/mcp/server.ts` で M3 tools/resources と SDK の enable/disable による dynamic exposure を実装
+- `packages/server/src/dev/m3Smoke.ts` と `packages/server/package.json` で `smoke:m3` を追加
+- `docs/m3-local-development.md` を追加
+
+### 検証済み
+
+- `npm --prefix packages/server run typecheck`
+- `$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source; npm --prefix packages/server run smoke:m3`
+- `$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source; npm --prefix packages/server run smoke:m2`
+- `$env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source; npm --prefix packages/server run smoke:m1`
+
 ### 後回し項目
 
 - tests 実行
 - screenshot
+- resource templates
 - 危険機能
 
 ## M4: Verification Loop Hardening

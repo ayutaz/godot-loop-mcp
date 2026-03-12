@@ -4,6 +4,7 @@ extends EditorPlugin
 const BridgeClient = preload("res://addons/godot_loop_mcp/bridge/bridge_client.gd")
 const CapabilityRegistry = preload("res://addons/godot_loop_mcp/capabilities/capability_registry.gd")
 const ObservationService = preload("res://addons/godot_loop_mcp/observation/observation_service.gd")
+const ProjectService = preload("res://addons/godot_loop_mcp/project/project_service.gd")
 const WorkspaceService = preload("res://addons/godot_loop_mcp/workspace/workspace_service.gd")
 
 const SETTING_BRIDGE_HOST := "godot_loop_mcp/bridge/host"
@@ -22,6 +23,7 @@ const LOG_FILE_NAME := "addon.log"
 var _bridge_client: RefCounted
 var _capability_registry: RefCounted
 var _observation_service: RefCounted
+var _project_service: RefCounted
 var _workspace_service: RefCounted
 var _current_state := "disconnected"
 
@@ -43,10 +45,12 @@ func _exit_tree() -> void:
 	_append_log("info", "Plugin disabled.", {"state": _current_state})
 	_dispose_bridge_client()
 	_dispose_observation_service()
+	_dispose_project_service()
 	_dispose_workspace_service()
 	_bridge_client = null
 	_capability_registry = null
 	_observation_service = null
+	_project_service = null
 
 
 func _process(delta: float) -> void:
@@ -68,8 +72,10 @@ func _on_disconnect_requested() -> void:
 func _start_bridge() -> void:
 	_dispose_bridge_client()
 	_dispose_observation_service()
+	_dispose_project_service()
 	_dispose_workspace_service()
 	_observation_service = ObservationService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
+	_project_service = ProjectService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
 	_workspace_service = WorkspaceService.new(get_editor_interface(), ProjectSettings.globalize_path("res://"))
 	if _observation_service != null and _observation_service.has_method("set_runtime_state_provider"):
 		_observation_service.set_runtime_state_provider(Callable(_workspace_service, "get_runtime_state"))
@@ -106,6 +112,12 @@ func _dispose_observation_service() -> void:
 	_observation_service = null
 
 
+func _dispose_project_service() -> void:
+	if _project_service == null:
+		return
+	_project_service = null
+
+
 func _dispose_workspace_service() -> void:
 	if _workspace_service == null:
 		return
@@ -119,6 +131,11 @@ func _handle_bridge_request(method: String, params: Variant = {}) -> Dictionary:
 		var observation_result: Dictionary = _observation_service.handle_request(method, params)
 		if typeof(observation_result) == TYPE_DICTIONARY and bool(observation_result.get("handled", false)):
 			return observation_result
+
+	if _project_service != null:
+		var project_result: Dictionary = _project_service.handle_request(method, params)
+		if typeof(project_result) == TYPE_DICTIONARY and bool(project_result.get("handled", false)):
+			return project_result
 
 	if _workspace_service != null:
 		return _workspace_service.handle_request(method, params)
@@ -176,9 +193,14 @@ func _build_client_identity() -> Dictionary:
 
 
 func _build_capability_overrides() -> Dictionary:
+	var overrides := {}
 	if _observation_service != null and _observation_service.has_method("get_capability_overrides"):
-		return _observation_service.get_capability_overrides()
-	return {"editor.console.capture": "disabled"}
+		overrides.merge(_observation_service.get_capability_overrides(), true)
+	if _project_service != null and _project_service.has_method("get_capability_overrides"):
+		overrides.merge(_project_service.get_capability_overrides(), true)
+	if not overrides.has("editor.console.capture"):
+		overrides["editor.console.capture"] = "disabled"
+	return overrides
 
 
 func _register_project_settings() -> void:

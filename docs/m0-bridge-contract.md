@@ -45,7 +45,7 @@ server は `bridge.handshake.hello` の response で以下を返します。
 - `workspaceRoot`
 - `reconnectPolicy`
 - `bridge.heartbeatIntervalMs`
-- `mcp` の予定 catalog
+- `mcp` の capability-aware catalog
 
 server は response の後に `bridge.handshake.sync` request を送り、Addon が `state=ready` で応答したら session を ready とみなします。
 
@@ -81,16 +81,24 @@ M0 では Addon が `enabled` と `planned` の両方を送って構いません
 - `bridge.handshake` (`enabled`)
 - `bridge.ping` (`enabled`)
 - `project.info` (`enabled`)
+- `project.search` (`enabled`)
 - `editor.state` (`enabled`)
+- `editor.selection.read` (`enabled`)
+- `editor.selection.write` (`enabled`)
+- `editor.focus` (`enabled`)
 - `scene.read` (`enabled`)
 - `scene.write` (`enabled`)
 - `script.read` (`enabled`)
 - `script.write` (`enabled`)
+- `resource.uid` (`enabled`)
+- `resource.resave` (`enabled`)
 - `logs.read` (`enabled`)
 - `logs.clear` (`enabled`)
 - `editor.console.capture` (`enabled` on `Godot 4.5+`, `disabled` on `4.4`)
 - `play.control` (`enabled`)
 - `runtime.debug` (`planned`)
+
+現行 server の `mcp` catalog は ready addon session の capability に応じて変化します。未接続時は fallback log surface のみを公開し、handshake 完了後に enabled capability 分の tools/resources を追加公開します。
 
 ## Security Levels
 
