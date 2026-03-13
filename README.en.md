@@ -12,7 +12,7 @@ The project is intended to provide:
 
 ## Status
 
-This repository now has the implementation surface for `M0` through `M6`, and the remaining repo-side work is effectively closed. The last open item is the npm-side trusted publisher registration.
+This repository now has the implementation surface for `M0` through `M6`, and the remaining repo-side work is effectively closed. The last open items are npm-side organization / scope creation and trusted publisher registration.
 
 The current baseline is a minimal `Godot Editor Addon + External MCP Server + Local TCP Bridge` design inspired by Unity's uLoopMCP:
 
@@ -27,7 +27,7 @@ The current baseline is a minimal `Godot Editor Addon + External MCP Server + Lo
 - Implemented: capability-aware dynamic MCP tool/resource exposure; when no addon session is ready, only the fallback log surface remains visible
 - Implemented: `Godot 4.5+` editor console capture via `OS.add_logger()`, headless play output via `.godot/mcp/runtime.log`, and `.godot/mcp` fallback on `4.4`
 - Implemented: GitHub Actions `run_tests` smoke and `test-reports` artifacts, plus a publishable `packages/server` contract
-- External setup pending: npm-side trusted publisher registration
+- External setup pending: npm organization / scope `godot-loop-mcp` creation and npm-side trusted publisher registration
 - Roadmap: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD plan: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -140,7 +140,7 @@ Security enforcement and the initial dangerous mode implementation are in place.
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: both server and addon must opt into `Dangerous`, plus write prefixes / shell allowlists / editor script opt-in
-- status: security enforcement, audit, release workflows, and the publishable package contract are implemented. The remaining item is the npm-side trusted publisher registration
+- status: security enforcement, audit, release workflows, and the publishable package contract are implemented. The remaining items are npm-side `godot-loop-mcp` scope setup and trusted publisher registration
 
 Verified commands:
 

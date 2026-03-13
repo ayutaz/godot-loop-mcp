@@ -12,7 +12,7 @@
 
 ## ステータス
 
-このリポジトリでは `M0` から `M6` の実装面が揃っており、repo 内の残作業はほぼ解消されています。残っているのは npm 側の trusted publisher 登録という外部設定です。
+このリポジトリでは `M0` から `M6` の実装面が揃っており、repo 内の残作業はほぼ解消されています。残っているのは npm 側の organization / scope 作成と trusted publisher 登録という外部設定です。
 
 現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
@@ -27,7 +27,7 @@
 - 実装済み: active addon session の capability manifest に応じて MCP tools/resources を動的公開し、未接続時は fallback log surface のみを露出
 - 実装済み: `Godot 4.5+` では `OS.add_logger()` による editor console capture、headless play output は `.godot/mcp/runtime.log` を返し、`4.4` では `.godot/mcp` fallback
 - 実装済み: GitHub Actions で `run_tests` smoke と `test-reports` artifact を統合し、`packages/server` を publishable package に固定
-- 外部設定待ち: npm trusted publisher の npm 側登録
+- 外部設定待ち: npm organization / scope `godot-loop-mcp` の作成と npm trusted publisher の npm 側登録
 - 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
 - CI/CD 計画: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
 
@@ -140,7 +140,7 @@ security enforcement と dangerous mode の最小実装は入っています。
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: server/addon の `Dangerous` 指定に加え、write prefix / shell allowlist / editor script opt-in が必要
-- status: security enforcement、監査、release workflow、publishable package 契約は実装済み。残るのは npm 側の trusted publisher 登録
+- status: security enforcement、監査、release workflow、publishable package 契約は実装済み。残るのは npm 側の `godot-loop-mcp` scope 準備と trusted publisher 登録
 
 確認済みコマンド:
 

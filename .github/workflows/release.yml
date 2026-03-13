@@ -243,6 +243,15 @@ jobs:
           cache: npm
           cache-dependency-path: packages/server/package-lock.json
 
+      - name: Upgrade npm CLI for trusted publishing
+        run: npm install --global npm@11.11.1
+
+      - name: Print Node.js and npm versions
+        shell: pwsh
+        run: |
+          "node=$(node --version)"
+          "npm=$(npm --version)"
+
       - name: Install server dependencies
         run: npm ci
         working-directory: packages/server
