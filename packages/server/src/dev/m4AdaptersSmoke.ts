@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   });
   const client = new Client({
     name: "godot-loop-mcp-m4-adapter-smoke",
-    version: "0.1.0"
+    version: "0.1.1"
   });
 
   let godotProcess: ChildProcess | undefined;
