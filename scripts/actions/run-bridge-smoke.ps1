@@ -1,15 +1,22 @@
 param(
-  [Parameter(Mandatory = $true)]
-  [string]$RepoRoot,
+  [string]$RepoRoot = "",
   [Parameter(Mandatory = $true)]
   [string]$GodotBinaryPath,
-  [string]$ArtifactsDir = (Join-Path $RepoRoot ".artifacts/bridge-smoke"),
+  [string]$ArtifactsDir = "",
   [int]$QuitAfterSeconds = 60
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+  $RepoRoot = (Get-Location).Path
+}
+
+if ([string]::IsNullOrWhiteSpace($ArtifactsDir)) {
+  $ArtifactsDir = Join-Path $RepoRoot ".artifacts/bridge-smoke"
+}
 
 $mcpLogDir = Join-Path $RepoRoot ".godot/mcp"
 Ensure-EmptyDirectory -Path $ArtifactsDir
