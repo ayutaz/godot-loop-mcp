@@ -34,12 +34,12 @@
 
 現時点で残っている差分は次です。
 
-- npm organization / scope `godot-loop-mcp` は未作成
+- npm organization `godot-loop-mcp` は未作成
 - npm trusted publisher の npm 側設定は未実施
 
 補足:
 
-このため、現行の CD は `GitHub Release asset 生成` と `publishable package 契約の検証` までは自動化し、`npm publish` は explicit opt-in + repository variable + npm organization / scope + npm trusted publisher 設定前提の job として置いています。
+このため、現行の CD は `GitHub Release asset 生成` と `publishable package 契約の検証` までは自動化し、`npm publish` は explicit opt-in + repository variable + npm organization + npm trusted publisher 設定前提の job として置いています。
 
 ローカル検証の source of truth:
 
@@ -309,7 +309,7 @@ npm 公式 docs では trusted publishing と provenance を使うことで long
 補足:
 
 2026-03-14 時点で `publish-npm` job は workflow 内で npm CLI `11.11.1` に更新してから実行するように修正済みです。  
-また `@godot-loop-mcp/server` は scoped package なので、先に npm organization / scope `godot-loop-mcp` を作る必要があります。
+また `@godot-loop-mcp/server` は npm organization `godot-loop-mcp` 配下の scoped package なので、先に organization を作る必要があります。
 
 ### Godot Asset Library handoff
 

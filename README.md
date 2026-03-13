@@ -12,7 +12,7 @@
 
 ## ステータス
 
-このリポジトリでは `M0` から `M6` の実装面が揃っており、repo 内の残作業はほぼ解消されています。残っているのは npm 側の organization / scope 作成と trusted publisher 登録という外部設定です。
+このリポジトリでは `M0` から `M6` の実装面が揃っており、repo 内の残作業はほぼ解消されています。残っているのは npm organization `godot-loop-mcp` の作成と trusted publisher 登録という外部設定です。
 
 現在の到達点は、Unity の uLoopMCP に着想を得た `Godot Editor Addon + External MCP Server + Local TCP Bridge` の最小実装です。
 
@@ -27,17 +27,17 @@
 - 実装済み: active addon session の capability manifest に応じて MCP tools/resources を動的公開し、未接続時は fallback log surface のみを露出
 - 実装済み: `Godot 4.5+` では `OS.add_logger()` による editor console capture、headless play output は `.godot/mcp/runtime.log` を返し、`4.4` では `.godot/mcp` fallback
 - 実装済み: GitHub Actions で `run_tests` smoke と `test-reports` artifact を統合し、`packages/server` を publishable package に固定
-- 外部設定待ち: npm organization / scope `godot-loop-mcp` の作成と npm trusted publisher の npm 側登録
-- 進行計画: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
-- CI/CD 計画: [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
+- 外部設定待ち: npm organization `godot-loop-mcp` の作成と npm trusted publisher の npm 側登録
+- 進行計画: [docs/implementation-milestones.md](docs/implementation-milestones.md)
+- CI/CD 計画: [docs/github-actions-cicd-plan.md](docs/github-actions-cicd-plan.md)
 
 ## M0 Bootstrap
 
 M0 の bridge 実装は動作確認済みです。
 
-- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M0`
-- マイルストーン: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
-- Asset Library チェックリスト: [docs/asset-library-release-checklist.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/asset-library-release-checklist.md)
+- 詳細: [docs/implementation-milestones.md](docs/implementation-milestones.md) の `M0`
+- マイルストーン: [docs/implementation-milestones.md](docs/implementation-milestones.md)
+- Asset Library チェックリスト: [docs/asset-library-release-checklist.md](docs/asset-library-release-checklist.md)
 
 確認済みの最小スモークテスト:
 
@@ -64,7 +64,7 @@ GitHub Actions では 2026-03-13 時点で次を定義済みです。
 
 M1 の read-only observation と hardening は実装済みです。
 
-- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M1`
+- 詳細: [docs/implementation-milestones.md](docs/implementation-milestones.md) の `M1`
 - tools: `get_project_info`, `get_editor_state`, `get_scene_tree`, `find_nodes`, `get_open_scripts`, `view_script`, `get_output_logs`, `get_godot_errors`
 - resources: `godot://project/info`, `godot://scene/current`, `godot://scene/tree`, `godot://scripts/open`, `godot://script/current`, `godot://errors/latest`
 - logs: `Godot 4.5+` では addon ring buffer を優先し、`Godot 4.4` では `.godot/mcp` の addon/server log に fallback
@@ -81,7 +81,7 @@ npm --prefix packages/server run smoke:m1
 
 M2 の edit/play loop は実装済みです。
 
-- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M2`
+- 詳細: [docs/implementation-milestones.md](docs/implementation-milestones.md) の `M2`
 - tools: `create_scene`, `open_scene`, `save_scene`, `play_scene`, `stop_scene`, `add_node`, `move_node`, `delete_node`, `update_property`, `create_script`, `attach_script`, `clear_output_logs`
 - security level: `WorkspaceWrite`
 - headless play: editor とは別の Godot process を起動し、`.godot/mcp/runtime.log` に runtime output を保存
@@ -99,7 +99,7 @@ npm --prefix packages/server run smoke:m2
 
 M3 の search / UID / dynamic capability surface は実装済みです。
 
-- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M3`
+- 詳細: [docs/implementation-milestones.md](docs/implementation-milestones.md) の `M3`
 - tools: `search_project`, `get_uid`, `resolve_uid`, `resave_resources`, `get_selection`, `set_selection`, `focus_node`
 - resources: `godot://selection/current`
 - dynamic catalog: addon 未接続時は `clear_output_logs`, `get_output_logs`, `get_godot_errors`, `godot://errors/latest` のみを公開し、ready session 後に capability に応じて tools/resources が増える
@@ -117,7 +117,7 @@ npm --prefix packages/server run smoke:m3
 
 M4 の verification loop hardening は実装済みです。
 
-- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M4`
+- 詳細: [docs/implementation-milestones.md](docs/implementation-milestones.md) の `M4`
 - tools: `run_tests`, `get_editor_screenshot`, `get_running_scene_screenshot`, `get_runtime_debug_events`, `clear_runtime_debug_events`
 - prompts: `godot_editor_strategy`, `godot_ui_layout_strategy`, `godot_debug_loop`, `godot_scene_edit_safety`
 - resource templates: `godot://scene/{path}`, `godot://script/{path}`, `godot://node/{scenePath}/{nodePath}`, `godot://resource/{uid}`
@@ -135,12 +135,12 @@ npm --prefix packages/server run smoke:m4
 
 security enforcement と dangerous mode の最小実装は入っています。
 
-- 詳細: [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md) の `M5` と `M6`
+- 詳細: [docs/implementation-milestones.md](docs/implementation-milestones.md) の `M5` と `M6`
 - security levels: `ReadOnly`, `WorkspaceWrite`, `Dangerous`
 - audit: `.godot/mcp/audit.log`
 - dangerous tools: `execute_editor_script`, `filesystem_write_raw`, `os_shell`
 - gating: server/addon の `Dangerous` 指定に加え、write prefix / shell allowlist / editor script opt-in が必要
-- status: security enforcement、監査、release workflow、publishable package 契約は実装済み。残るのは npm 側の `godot-loop-mcp` scope 準備と trusted publisher 登録
+- status: security enforcement、監査、release workflow、publishable package 契約は実装済み。残るのは npm organization `godot-loop-mcp` の作成と trusted publisher 登録
 
 確認済みコマンド:
 
