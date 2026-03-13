@@ -21,10 +21,17 @@ If the current directory is not the Godot project root, set `GODOT_LOOP_MCP_REPO
 ```powershell
 npm ci
 npm run typecheck
+npm run dev
+```
+
+To verify the published entry locally:
+
+```powershell
+npm run build
 npm run start
 ```
 
-The published CLI uses a small JS launcher and still relies on Node's `--experimental-strip-types` support for the shipped `.ts` sources.
+The published CLI runs from compiled JS in `dist/`. The source repo still uses Node's `--experimental-strip-types` flow for local development, and `prepack` rebuilds `dist/` before `npm pack` / `npm publish`.
 
 Publishability checks:
 

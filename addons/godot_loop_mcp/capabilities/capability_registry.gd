@@ -4,7 +4,7 @@ extends RefCounted
 const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
 
 const PROTOCOL_VERSION := "0.1.0"
-const PLUGIN_VERSION := "0.1.0"
+const PLUGIN_VERSION := "0.1.1"
 
 
 func build_manifest(capability_overrides: Dictionary = {}, security_level: String = "") -> Dictionary:

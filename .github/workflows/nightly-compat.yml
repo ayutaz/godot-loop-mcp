@@ -33,7 +33,7 @@ jobs:
       timeout_minutes: 20
       artifact_name: bridge-smoke-${{ matrix.os }}-${{ matrix.godot_version }}
       artifact_paths: |
-        ${{ github.workspace }}/.artifacts/bridge-smoke
-        ${{ github.workspace }}/.godot/mcp
-      smoke_command: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+        .artifacts/bridge-smoke
+        .godot/mcp
+      smoke_command: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "$env:GITHUB_WORKSPACE" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "$env:GITHUB_WORKSPACE/.artifacts/bridge-smoke"
       retention_days: 14

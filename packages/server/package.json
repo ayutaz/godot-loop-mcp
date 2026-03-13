@@ -1,7 +1,7 @@
 {
   "name": "@godot-loop-mcp/server",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP bridge server for godot-loop-mcp.",
   "license": "Apache-2.0",
   "type": "module",
@@ -30,14 +30,16 @@
   "files": [
     "bin/",
     "README.md",
-    "src/",
-    "tsconfig.json"
+    "dist/"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "start": "node --experimental-strip-types src/index.ts",
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
+    "start": "node dist/index.js",
     "dev": "node --experimental-strip-types --watch src/index.ts",
     "pack": "npm pack",
     "pack:dry-run": "npm pack --dry-run",

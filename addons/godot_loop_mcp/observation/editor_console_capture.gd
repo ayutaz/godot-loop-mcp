@@ -58,7 +58,7 @@ func _init(max_entries: int = 500) -> void:
 
 func dispose() -> void:
 	if bool(_status.get("enabled", false)) and _logger_instance != null and OS.has_method("remove_logger"):
-		OS.remove_logger(_logger_instance)
+		OS.call("remove_logger", _logger_instance)
 
 	_logger_instance = null
 	_logger_script = null
@@ -161,7 +161,7 @@ func _start_capture() -> void:
 		_status["reason"] = "Failed to instantiate Logger bridge script."
 		return
 
-	OS.add_logger(logger_instance)
+	OS.call("add_logger", logger_instance)
 	_logger_script = logger_script
 	_logger_instance = logger_instance
 	_status["enabled"] = true

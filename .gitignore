@@ -3,6 +3,7 @@
 /.tools/
 /dist/
 /packages/server/node_modules/
+/packages/server/dist/
 /packages/server/.npm/
 /packages/server/*.log
 /packages/server/*.tgz

@@ -633,7 +633,7 @@ func _normalize_extension_filters(raw_filters: Variant) -> Dictionary:
 
 
 func _describe_uid(resource_path: String) -> Dictionary:
-	var uid_text := str(ResourceUID.path_to_uid(resource_path))
+	var uid_text := _path_to_uid_text(resource_path)
 	var uid_id := ResourceUID.INVALID_ID
 	var has_uid := false
 	if uid_text.begins_with("uid://") and uid_text != "uid://<invalid>":
@@ -646,6 +646,22 @@ func _describe_uid(resource_path: String) -> Dictionary:
 		"uidId": uid_id,
 		"resolvedPath": str(ResourceUID.get_id_path(uid_id)) if has_uid and ResourceUID.has_id(uid_id) else ""
 	}
+
+
+func _path_to_uid_text(resource_path: String) -> String:
+	if resource_path == "":
+		return ""
+	if not ResourceLoader.exists(resource_path):
+		return ""
+
+	var uid_id := int(ResourceLoader.get_resource_uid(resource_path))
+	if uid_id == ResourceUID.INVALID_ID:
+		return ""
+
+	var uid_text := str(ResourceUID.id_to_text(uid_id))
+	if uid_text == "uid://<invalid>":
+		return ""
+	return uid_text
 
 
 func _resolve_uid_path(requested_uid: String, requested_uid_id: int) -> String:
@@ -693,7 +709,7 @@ func _scan_workspace_for_uid(resource_dir_path: String, requested_uid: String) -
 					directory.list_dir_end()
 					return resolved_path
 		elif not _should_skip_uid_scan_file(candidate_path):
-			if str(ResourceUID.path_to_uid(candidate_path)) == requested_uid:
+			if _path_to_uid_text(candidate_path) == requested_uid:
 				directory.list_dir_end()
 				return candidate_path
 

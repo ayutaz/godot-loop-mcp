@@ -20,6 +20,7 @@ permissions:
   contents: read
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
 
 concurrency:
@@ -43,9 +44,9 @@ jobs:
       timeout_minutes: 15
       artifact_name: release-smoke-logs
       artifact_paths: |
-        ${{ github.workspace }}/.artifacts/bridge-smoke
-        ${{ github.workspace }}/.godot/mcp
-      smoke_command: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "${{ github.workspace }}" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "${{ github.workspace }}/.artifacts/bridge-smoke"
+        .artifacts/bridge-smoke
+        .godot/mcp
+      smoke_command: ./scripts/actions/run-bridge-smoke.ps1 -RepoRoot "$env:GITHUB_WORKSPACE" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "$env:GITHUB_WORKSPACE/.artifacts/bridge-smoke"
       retention_days: 30
 
   verification-smoke:
@@ -58,8 +59,8 @@ jobs:
       timeout_minutes: 20
       artifact_name: release-test-reports
       artifact_paths: |
-        ${{ github.workspace }}/.godot/mcp/test-reports
-        ${{ github.workspace }}/.godot/mcp/audit.log
+        .godot/mcp/test-reports
+        .godot/mcp/audit.log
       smoke_command: npm --prefix packages/server run smoke:m4
       retention_days: 30
 
@@ -70,7 +71,7 @@ jobs:
       - verification-smoke
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Package addon zip
         id: package_addon
@@ -78,7 +79,7 @@ jobs:
         run: ./scripts/actions/package-addon.ps1 -RepoRoot "${{ github.workspace }}" -Version "${{ env.RELEASE_TAG }}" -OutputDir "${{ github.workspace }}/dist/release"
 
       - name: Upload addon package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-addon
           path: ${{ github.workspace }}/dist/release/godot-loop-mcp-addon-*.zip
@@ -92,10 +93,10 @@ jobs:
       - verification-smoke
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22.14.0
           cache: npm
@@ -122,7 +123,7 @@ jobs:
         working-directory: packages/server
 
       - name: Upload server package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-server
           path: ${{ github.workspace }}/dist/release/*.tgz
@@ -141,28 +142,28 @@ jobs:
     environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download addon package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: release-addon
           path: ${{ github.workspace }}/dist/release
 
       - name: Download server package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: release-server
           path: ${{ github.workspace }}/dist/release
 
       - name: Download smoke logs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: release-smoke-logs
           path: ${{ github.workspace }}/dist/smoke-logs
 
       - name: Download test reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: release-test-reports
           path: ${{ github.workspace }}/dist/test-reports
@@ -232,10 +233,10 @@ jobs:
     environment: npm
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22.14.0
           registry-url: https://registry.npmjs.org

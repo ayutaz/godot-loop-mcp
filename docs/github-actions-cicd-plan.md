@@ -1,7 +1,7 @@
 # GitHub Actions CI/CD 計画
 
 作成日: 2026-03-12  
-更新日: 2026-03-13  
+更新日: 2026-03-14  
 対象リポジトリ: `godot-loop-mcp`
 
 ## 目的
@@ -29,6 +29,8 @@
 - `scripts/actions/write-sha256.ps1`
 - `packages/server/package-lock.json`
 - `packages/server/bin/godot-loop-mcp-server.js`
+- official GitHub Actions を Node 24 対応 major に更新済み
+- `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` を reusable workflow / release workflow に設定済み
 
 現時点で残っている差分は次です。
 
