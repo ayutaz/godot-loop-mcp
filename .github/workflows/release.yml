@@ -10,11 +10,6 @@ on:
         description: Release tag to package and publish.
         required: true
         type: string
-      publish_npm:
-        description: Publish the server package to npm when trusted publishing is configured.
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -226,7 +221,7 @@ jobs:
       - bridge-smoke
       - verification-smoke
       - package-server
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_npm && vars.NPM_PUBLISH_ENABLED == 'true' }}
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && vars.NPM_PUBLISH_ENABLED == 'true' }}
     permissions:
       contents: read
       id-token: write
