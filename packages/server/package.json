@@ -1,7 +1,7 @@
 {
   "name": "@godot-loop-mcp/server",
   "private": false,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP bridge server for godot-loop-mcp.",
   "license": "Apache-2.0",
   "type": "module",
