@@ -34,11 +34,12 @@
 
 現時点で残っている差分は次です。
 
+- npm organization `godot-loop-mcp` は未作成
 - npm trusted publisher の npm 側設定は未実施
 
 補足:
 
-このため、現行の CD は `GitHub Release asset 生成` と `publishable package 契約の検証` までは自動化し、`npm publish` は explicit opt-in + repository variable + npm trusted publisher 設定前提の job として置いています。
+このため、現行の CD は `GitHub Release asset 生成` と `publishable package 契約の検証` までは自動化し、`npm publish` は explicit opt-in + repository variable + npm organization + npm trusted publisher 設定前提の job として置いています。
 
 ローカル検証の source of truth:
 
@@ -295,6 +296,7 @@ publish 方針:
 
 - npm trusted publishing を使う
 - GitHub-hosted runner 上で実行する
+- npm CLI `11.5.1+` を使う
 - OIDC に必要な `id-token: write` だけ付与する
 - provenance を有効にする
 - 現行 workflow では `workflow_dispatch + publish_npm=true + repository variable` を満たした時だけ動かす
@@ -303,6 +305,11 @@ publish 方針:
 
 npm 公式 docs では trusted publishing と provenance を使うことで long-lived token を避けられます。  
 この repo では release job に npm 書き込みトークンを置かない方針を採ります。
+
+補足:
+
+2026-03-14 時点で `publish-npm` job は workflow 内で npm CLI `11.11.1` に更新してから実行するように修正済みです。  
+また `@godot-loop-mcp/server` は npm organization `godot-loop-mcp` 配下の scoped package なので、先に organization を作る必要があります。
 
 ### Godot Asset Library handoff
 
@@ -452,6 +459,7 @@ GitHub Docs では、private repository では environment 機能や protection 
 
 外部設定待ち:
 
+- npm organization `godot-loop-mcp` を作成
 - npm package に trusted publisher を設定
   - package: `@godot-loop-mcp/server`
   - repository: `ayutaz/godot-loop-mcp`
