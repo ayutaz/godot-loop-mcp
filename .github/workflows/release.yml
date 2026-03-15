@@ -23,10 +23,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve-godot-support:
+    runs-on: ubuntu-latest
+    outputs:
+      latest_stable_version: ${{ steps.resolve.outputs.latest_stable_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Resolve supported Godot versions
+        id: resolve
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/actions/get-godot-support-matrix.ps1 -FloorVersion "4.4.1-stable"
+
   server-check:
     uses: ./.github/workflows/reusable-server-check.yml
     with:
       artifact_name: release-server-bootstrap
+      checkout_fetch_depth: 0
+      checkout_ref: ${{ env.RELEASE_TAG }}
+      release_tag: ${{ env.RELEASE_TAG }}
       retention_days: 30
 
   bridge-smoke:
@@ -35,6 +56,8 @@ jobs:
     uses: ./.github/workflows/reusable-godot-smoke.yml
     with:
       runner: windows-latest
+      checkout_fetch_depth: 0
+      checkout_ref: ${{ env.RELEASE_TAG }}
       godot_version: 4.4.1-stable
       timeout_minutes: 15
       artifact_name: release-smoke-logs
@@ -46,11 +69,14 @@ jobs:
 
   verification-smoke:
     needs:
+      - resolve-godot-support
       - server-check
     uses: ./.github/workflows/reusable-godot-smoke.yml
     with:
       runner: windows-latest
-      godot_version: 4.5.1-stable
+      checkout_fetch_depth: 0
+      checkout_ref: ${{ env.RELEASE_TAG }}
+      godot_version: ${{ needs.resolve-godot-support.outputs.latest_stable_version }}
       timeout_minutes: 20
       artifact_name: release-test-reports
       artifact_paths: |
@@ -59,14 +85,35 @@ jobs:
       smoke_command: npm --prefix packages/server run smoke:m4
       retention_days: 30
 
+  packaged-install-smoke:
+    needs:
+      - resolve-godot-support
+      - server-check
+    uses: ./.github/workflows/reusable-godot-smoke.yml
+    with:
+      runner: windows-latest
+      checkout_fetch_depth: 0
+      checkout_ref: ${{ env.RELEASE_TAG }}
+      godot_version: ${{ needs.resolve-godot-support.outputs.latest_stable_version }}
+      timeout_minutes: 20
+      artifact_name: release-packaged-install-smoke
+      artifact_paths: |
+        .artifacts/packaged-install-smoke
+      smoke_command: ./scripts/actions/run-packaged-install-smoke.ps1 -RepoRoot "$env:GITHUB_WORKSPACE" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "$env:GITHUB_WORKSPACE/.artifacts/packaged-install-smoke" -PackageVersion "${{ env.RELEASE_TAG }}"
+      retention_days: 30
+
   package-addon:
     runs-on: ubuntu-latest
     needs:
       - bridge-smoke
+      - packaged-install-smoke
       - verification-smoke
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Package addon zip
         id: package_addon
@@ -74,7 +121,7 @@ jobs:
         run: ./scripts/actions/package-addon.ps1 -RepoRoot "${{ github.workspace }}" -Version "${{ env.RELEASE_TAG }}" -OutputDir "${{ github.workspace }}/dist/release"
 
       - name: Upload addon package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-addon
           path: ${{ github.workspace }}/dist/release/godot-loop-mcp-addon-*.zip
@@ -85,13 +132,17 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - bridge-smoke
+      - packaged-install-smoke
       - verification-smoke
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22.14.0
           cache: npm
@@ -118,7 +169,7 @@ jobs:
         working-directory: packages/server
 
       - name: Upload server package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-server
           path: ${{ github.workspace }}/dist/release/*.tgz
@@ -131,34 +182,38 @@ jobs:
       - package-addon
       - package-server
       - bridge-smoke
+      - packaged-install-smoke
       - verification-smoke
     permissions:
       contents: write
     environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Download addon package
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: release-addon
           path: ${{ github.workspace }}/dist/release
 
       - name: Download server package
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: release-server
           path: ${{ github.workspace }}/dist/release
 
       - name: Download smoke logs
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: release-smoke-logs
           path: ${{ github.workspace }}/dist/smoke-logs
 
       - name: Download test reports
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: release-test-reports
           path: ${{ github.workspace }}/dist/test-reports
@@ -209,7 +264,7 @@ jobs:
               throw "gh release upload failed for $tag."
             }
           } else {
-            gh release create $tag @assets --title $tag --generate-notes --target "${{ github.sha }}"
+            gh release create $tag @assets --verify-tag --title $tag --generate-notes
             if ($LASTEXITCODE -ne 0) {
               throw "gh release create failed for $tag."
             }
@@ -219,6 +274,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - bridge-smoke
+      - packaged-install-smoke
       - verification-smoke
       - package-server
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && vars.NPM_PUBLISH_ENABLED == 'true' }}
@@ -228,10 +284,13 @@ jobs:
     environment: npm
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22.14.0
           registry-url: https://registry.npmjs.org
