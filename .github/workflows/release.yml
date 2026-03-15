@@ -46,8 +46,8 @@ jobs:
     with:
       artifact_name: release-server-bootstrap
       checkout_fetch_depth: 0
-      checkout_ref: ${{ env.RELEASE_TAG }}
-      release_tag: ${{ env.RELEASE_TAG }}
+      checkout_ref: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+      release_tag: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
       retention_days: 30
 
   bridge-smoke:
@@ -57,7 +57,7 @@ jobs:
     with:
       runner: windows-latest
       checkout_fetch_depth: 0
-      checkout_ref: ${{ env.RELEASE_TAG }}
+      checkout_ref: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
       godot_version: 4.4.1-stable
       timeout_minutes: 15
       artifact_name: release-smoke-logs
@@ -75,7 +75,7 @@ jobs:
     with:
       runner: windows-latest
       checkout_fetch_depth: 0
-      checkout_ref: ${{ env.RELEASE_TAG }}
+      checkout_ref: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
       godot_version: ${{ needs.resolve-godot-support.outputs.latest_stable_version }}
       timeout_minutes: 20
       artifact_name: release-test-reports
@@ -93,7 +93,7 @@ jobs:
     with:
       runner: windows-latest
       checkout_fetch_depth: 0
-      checkout_ref: ${{ env.RELEASE_TAG }}
+      checkout_ref: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
       godot_version: ${{ needs.resolve-godot-support.outputs.latest_stable_version }}
       timeout_minutes: 20
       artifact_name: release-packaged-install-smoke
