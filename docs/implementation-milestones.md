@@ -10,8 +10,8 @@
 - サポート対象: `Godot 4.4+`
 - server 要件: `Node.js 22.14.0+`
 - 最新公開版:
-  - GitHub Release: `v0.1.3`
-  - npm: `@godot-loop-mcp/server@0.1.3`
+  - GitHub Release: `v0.2.0`
+  - npm: `@godot-loop-mcp/server@0.2.0`
 - 配布形態:
   - Addon は GitHub Release ZIP
   - server は npm package
