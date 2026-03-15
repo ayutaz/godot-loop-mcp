@@ -6,6 +6,7 @@ import type { SecurityLevel } from "./transport/types.ts";
 export interface ServerConfig {
   host: string;
   port: number;
+  controlPort: number;
   heartbeatIntervalMs: number;
   connectTimeoutMs: number;
   handshakeTimeoutMs: number;
@@ -27,6 +28,7 @@ export function loadConfig(): ServerConfig {
   return {
     host: process.env.GODOT_LOOP_MCP_HOST ?? "127.0.0.1",
     port: numberFromEnv("GODOT_LOOP_MCP_PORT", 6010),
+    controlPort: numberFromEnv("GODOT_LOOP_MCP_CONTROL_PORT", 6011),
     heartbeatIntervalMs: numberFromEnv("GODOT_LOOP_MCP_HEARTBEAT_MS", 15_000),
     connectTimeoutMs: numberFromEnv("GODOT_LOOP_MCP_CONNECT_TIMEOUT_MS", 5_000),
     handshakeTimeoutMs: numberFromEnv("GODOT_LOOP_MCP_HANDSHAKE_TIMEOUT_MS", 5_000),
