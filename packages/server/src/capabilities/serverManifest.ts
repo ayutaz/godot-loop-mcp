@@ -7,7 +7,7 @@ import type {
 } from "../transport/types.ts";
 
 export const PROTOCOL_VERSION = "0.1.0";
-export const SERVER_VERSION = "0.1.3";
+export const SERVER_VERSION = "0.2.0";
 
 export function buildServerCapabilityManifest(securityLevel: SecurityLevel): CapabilityManifest {
   return {
