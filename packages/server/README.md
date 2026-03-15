@@ -103,5 +103,5 @@ Security and audit notes:
 
 Relevant guides:
 
-- [docs/implementation-milestones.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/implementation-milestones.md)
-- [docs/github-actions-cicd-plan.md](/C:/Users/yuta/Desktop/Private/godot-loop-mcp/docs/github-actions-cicd-plan.md)
+- [../../docs/implementation-milestones.md](../../docs/implementation-milestones.md)
+- [../../docs/github-actions-cicd-plan.md](../../docs/github-actions-cicd-plan.md)
