@@ -99,7 +99,7 @@ jobs:
       artifact_name: release-packaged-install-smoke
       artifact_paths: |
         .artifacts/packaged-install-smoke
-      smoke_command: ./scripts/actions/run-packaged-install-smoke.ps1 -RepoRoot "$env:GITHUB_WORKSPACE" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "$env:GITHUB_WORKSPACE/.artifacts/packaged-install-smoke" -PackageVersion "${{ env.RELEASE_TAG }}"
+      smoke_command: ./scripts/actions/run-packaged-install-smoke.ps1 -RepoRoot "$env:GITHUB_WORKSPACE" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "$env:GITHUB_WORKSPACE/.artifacts/packaged-install-smoke" -PackageVersion "${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
       retention_days: 30
 
   package-addon:
