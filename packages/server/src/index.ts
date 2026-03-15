@@ -55,6 +55,12 @@ server.listen(config.port, config.host, () => {
     securityLevel: config.securityLevel,
     mcpCatalog: buildMcpCatalog({ securityLevel: config.securityLevel })
   });
+  if (!config.bridgeOnlyMode) {
+    logger.info(
+      "Running in unified mode. For persistent connections across MCP client restarts, use daemon+proxy mode.",
+      { hint: "godot-loop-mcp-daemon + godot-loop-mcp-proxy" }
+    );
+  }
   if (mcpServer) {
     void mcpServer.connectStdio().catch((error) => {
       logger.error("Failed to start MCP stdio transport.", {

@@ -25,7 +25,9 @@
     "node": ">=22.14.0"
   },
   "bin": {
-    "godot-loop-mcp-server": "bin/godot-loop-mcp-server.js"
+    "godot-loop-mcp-server": "bin/godot-loop-mcp-server.js",
+    "godot-loop-mcp-daemon": "bin/godot-loop-mcp-daemon.js",
+    "godot-loop-mcp-proxy": "bin/godot-loop-mcp-proxy.js"
   },
   "files": [
     "bin/",
@@ -41,6 +43,8 @@
     "prepack": "npm run build",
     "start": "node dist/index.js",
     "dev": "node --experimental-strip-types --watch src/index.ts",
+    "dev:daemon": "node --experimental-strip-types src/daemon/index.ts",
+    "dev:proxy": "node --experimental-strip-types src/proxy/index.ts",
     "pack": "npm pack",
     "pack:dry-run": "npm pack --dry-run",
     "publish:dry-run": "npm publish --dry-run --access public",
@@ -51,7 +55,8 @@
     "smoke:m4": "node --experimental-strip-types src/dev/m4Smoke.ts",
     "smoke:m4:adapters": "node --experimental-strip-types src/dev/m4AdaptersSmoke.ts",
     "smoke:m4:gui": "node --experimental-strip-types src/dev/m4GuiSmoke.ts",
-    "smoke:m6": "node --experimental-strip-types src/dev/m6Smoke.ts"
+    "smoke:m6": "node --experimental-strip-types src/dev/m6Smoke.ts",
+    "smoke:daemon-proxy": "node --experimental-strip-types src/dev/daemonProxySmoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
