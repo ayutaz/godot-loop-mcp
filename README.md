@@ -2,36 +2,60 @@
 
 [English README](README.en.md)
 
-`godot-loop-mcp` は Godot 4.4+ 向けの MCP 開発ループです。
+`godot-loop-mcp` は Godot 4.4+ 向けの MCP ベース開発支援ツールです。  
+Godot Editor Addon と外部 MCP server をローカル TCP bridge で接続し、AI や外部クライアントから Godot project の観測、編集、実行、検証を行えるようにします。
 
-- Godot Editor Addon
-- external MCP server
-- local TCP bridge
+## 主な機能
 
-目的は `inspect -> edit -> run -> verify` を Godot で回せることです。
+- editor / runtime の状態観測
+- scene / node / script の編集
+- `play_scene` / `stop_scene` による実行ループ
+- project search, UID, selection, focus
+- tests, prompts, resource templates
+- capability-gated screenshot / runtime debug surface
+- security level, audit log, dangerous tool gating
+- GitHub Release と npm package による配布
 
-## 現在の状態
+## サポート範囲
 
-- 実装面は `M0` から `M6` まで反映済み
-- GitHub Release は `v0.1.3` を公開済み
-- npm package は `@godot-loop-mcp/server@0.1.3` を公開済み
-- release workflow は `v*` tag push で GitHub Release と npm publish まで通る
+- Godot: `4.4+`
+- Node.js: `22.14.0+`
+- npm package: `@godot-loop-mcp/server`
+- 最新公開版:
+  - GitHub Release: `v0.1.3`
+  - npm: `@godot-loop-mcp/server@0.1.3`
 
-## クイックスタート
+## インストール
 
-Addon:
+### 1. Addon
 
-- GitHub Release の `godot-loop-mcp-addon-*.zip` を展開して `addons/godot_loop_mcp/` に置く
-- `Project Settings > Plugins` で `Godot Loop MCP` を有効化する
+GitHub Release の `godot-loop-mcp-addon-*.zip` を展開し、Godot project の `addons/godot_loop_mcp/` に配置します。
 
-Server:
+その後、Godot の `Project Settings > Plugins` で `Godot Loop MCP` を有効化します。
+
+### 2. Server
 
 ```powershell
 npm install --save-dev @godot-loop-mcp/server
+```
+
+Godot project root で起動する場合:
+
+```powershell
 npx @godot-loop-mcp/server
 ```
 
-Godot 側の最小確認:
+project root 以外から起動する場合は `GODOT_LOOP_MCP_REPO_ROOT` を設定します。
+
+## クイックスタート
+
+server:
+
+```powershell
+npx @godot-loop-mcp/server
+```
+
+Godot:
 
 ```powershell
 godot_console.exe --headless --editor --quit-after 240 --path .
@@ -42,14 +66,23 @@ godot_console.exe --headless --editor --quit-after 240 --path .
 - addon log に `Bridge handshake completed`
 - server log に `Addon handshake completed`
 
-## ローカル開発
+## リポジトリ構成
+
+```text
+addons/godot_loop_mcp/   Godot Editor Addon
+packages/server/         MCP bridge server
+docs/                    運用・調査・配布ドキュメント
+.github/workflows/       CI/CD
+```
+
+## 開発
 
 ```powershell
 npm ci --prefix packages/server
 npm --prefix packages/server run typecheck
 ```
 
-主な smoke:
+代表的な smoke:
 
 ```powershell
 $env:GODOT_LOOP_MCP_GODOT_BIN = (Get-Command godot_console.exe).Source
@@ -60,7 +93,7 @@ npm --prefix packages/server run smoke:m4
 npm --prefix packages/server run smoke:m6
 ```
 
-GUI 前提の検証:
+GUI 前提の確認:
 
 ```powershell
 $env:GODOT_LOOP_MCP_GODOT_GUI_BIN = (Get-Command godot.exe).Source
@@ -72,14 +105,15 @@ npm --prefix packages/server run smoke:m4:gui
 - 実装状況と quick reference: [docs/implementation-milestones.md](docs/implementation-milestones.md)
 - CI/CD 運用: [docs/github-actions-cicd-plan.md](docs/github-actions-cicd-plan.md)
 - Asset Library handoff: [docs/asset-library-release-checklist.md](docs/asset-library-release-checklist.md)
-- 調査アーカイブ: [docs/godot-4.4-mcp-technical-research.md](docs/godot-4.4-mcp-technical-research.md)
+- 設計判断のアーカイブ: [docs/godot-4.4-mcp-technical-research.md](docs/godot-4.4-mcp-technical-research.md)
+- server package details: [packages/server/README.md](packages/server/README.md)
 
 ## 現在の制約
 
-- `Godot 4.5+` では editor console capture を優先し、`4.4` では `.godot/mcp` fallback を返す
-- screenshot と `runtime.debug` は capability-gated
-- 危険機能は explicit opt-in と allowlist 前提
-- Godot Asset Library への公開は半手動運用
+- `Godot 4.5+` では editor console capture を優先し、`4.4` では `.godot/mcp` fallback を返します
+- screenshot と `runtime.debug` は capability-gated です
+- dangerous tools は explicit opt-in と allowlist 前提です
+- Godot Asset Library への公開は手動 handoff です
 
 ## ライセンス
 
