@@ -21,6 +21,7 @@ Godot Editor Addon と外部 MCP server をローカル TCP bridge で接続し�
 - Godot: `4.4+`
 - Node.js: `22.14.0+`
 - npm package: `@godot-loop-mcp/server`
+- CI coverage: `4.4.1-stable` + current latest stable `4.x` on Windows, nightly also on Ubuntu
 - 最新公開版:
   - GitHub Release: `v0.1.3`
   - npm: `@godot-loop-mcp/server@0.1.3`

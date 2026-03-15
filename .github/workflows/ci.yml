@@ -14,6 +14,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-godot-support:
+    runs-on: ubuntu-latest
+    outputs:
+      latest_stable_version: ${{ steps.resolve.outputs.latest_stable_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Resolve supported Godot versions
+        id: resolve
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/actions/get-godot-support-matrix.ps1 -FloorVersion "4.4.1-stable"
+
   server-check:
     uses: ./.github/workflows/reusable-server-check.yml
     with:
@@ -37,14 +52,30 @@ jobs:
 
   verification-smoke:
     needs:
+      - resolve-godot-support
       - server-check
     uses: ./.github/workflows/reusable-godot-smoke.yml
     with:
       runner: windows-latest
-      godot_version: 4.5.1-stable
+      godot_version: ${{ needs.resolve-godot-support.outputs.latest_stable_version }}
       timeout_minutes: 20
       artifact_name: verification-smoke-windows
       artifact_paths: |
         .godot/mcp
       smoke_command: npm --prefix packages/server run smoke:m4
+      retention_days: 7
+
+  packaged-install-smoke:
+    needs:
+      - resolve-godot-support
+      - server-check
+    uses: ./.github/workflows/reusable-godot-smoke.yml
+    with:
+      runner: windows-latest
+      godot_version: ${{ needs.resolve-godot-support.outputs.latest_stable_version }}
+      timeout_minutes: 20
+      artifact_name: packaged-install-smoke-windows
+      artifact_paths: |
+        .artifacts/packaged-install-smoke
+      smoke_command: ./scripts/actions/run-packaged-install-smoke.ps1 -RepoRoot "$env:GITHUB_WORKSPACE" -GodotBinaryPath "$env:GODOT_LOOP_MCP_GODOT_BIN" -ArtifactsDir "$env:GITHUB_WORKSPACE/.artifacts/packaged-install-smoke" -PackageVersion "vci-packaged-smoke"
       retention_days: 7

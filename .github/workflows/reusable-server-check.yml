@@ -7,9 +7,21 @@ on:
         required: false
         default: server-bootstrap
         type: string
+      checkout_fetch_depth:
+        required: false
+        default: 1
+        type: number
+      checkout_ref:
+        required: false
+        default: ""
+        type: string
       node_version:
         required: false
         default: 22.14.0
+        type: string
+      release_tag:
+        required: false
+        default: ""
         type: string
       retention_days:
         required: false
@@ -33,14 +45,22 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: ${{ inputs.checkout_fetch_depth }}
+          ref: ${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.ref }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: ${{ inputs.node_version }}
           cache: npm
           cache-dependency-path: packages/server/package-lock.json
+
+      - name: Validate release metadata
+        if: ${{ inputs.release_tag != '' }}
+        shell: pwsh
+        run: ./scripts/actions/assert-release-metadata.ps1 -RepoRoot "${{ github.workspace }}" -ReleaseTag "${{ inputs.release_tag }}"
 
       - name: Install server dependencies
         run: npm ci
@@ -64,7 +84,7 @@ jobs:
 
       - name: Upload server bootstrap logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ github.workspace }}/.artifacts/server-bootstrap

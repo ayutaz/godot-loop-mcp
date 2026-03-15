@@ -189,6 +189,9 @@ npm --prefix packages/server run smoke:m4:gui
 - reusable workflows
 - Addon ZIP / server tarball / `SHA256SUMS` / `test-reports`
 - npm trusted publishing
+- release tag / package version / plugin version / public docs の整合チェック
+- packaged Addon ZIP / server `.tgz` を使う install smoke
+- privileged actions の SHA pin
 
 確認:
 
@@ -199,7 +202,9 @@ Get-Content .godot/mcp/audit.log -Tail 20
 補足:
 
 - `publish-npm` は `v*` tag push のみで動く
-- `workflow_dispatch` は release packaging の再実行用
+- `workflow_dispatch` でも指定した tag ref を checkout して release packaging を再実行する
+- `ci` / `release` は `4.4.1-stable` と current latest stable `4.x` を組み合わせて検証する
+- `nightly-compat` は support floor + latest stable を Windows / Ubuntu で回す
 
 ### M6
 

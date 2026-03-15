@@ -31,6 +31,13 @@ $serverFileLogPath = Join-Path $mcpLogDir "server.log"
 
 $serverProcess = $null
 $godotProcess = $null
+$serverWorkdir = Join-Path $RepoRoot "packages/server"
+$serverEntrypoint = if (Test-Path -LiteralPath (Join-Path $serverWorkdir "dist/index.js")) {
+  @("dist/index.js")
+}
+else {
+  @("--experimental-strip-types", "src/index.ts")
+}
 $originalBridgeOnly = $env:GODOT_LOOP_MCP_BRIDGE_ONLY
 $originalLogDir = $env:GODOT_LOOP_MCP_LOG_DIR
 $scanConflictState = Suspend-GodotScanConflicts -RepoRoot $RepoRoot
@@ -39,8 +46,8 @@ try {
   $env:GODOT_LOOP_MCP_LOG_DIR = $mcpLogDir
 
   $serverProcess = Start-Process -FilePath "node" `
-    -ArgumentList @("--experimental-strip-types", "src/index.ts") `
-    -WorkingDirectory (Join-Path $RepoRoot "packages/server") `
+    -ArgumentList $serverEntrypoint `
+    -WorkingDirectory $serverWorkdir `
     -RedirectStandardOutput $serverStdoutPath `
     -RedirectStandardError $serverStderrPath `
     -PassThru

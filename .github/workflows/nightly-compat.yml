@@ -13,19 +13,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-godot-support:
+    runs-on: ubuntu-latest
+    outputs:
+      nightly_matrix: ${{ steps.resolve.outputs.nightly_matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Resolve nightly Godot matrix
+        id: resolve
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/actions/get-godot-support-matrix.ps1 -FloorVersion "4.4.1-stable"
+
   bridge-smoke-matrix:
+    needs:
+      - resolve-godot-support
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            godot_version: 4.4.1-stable
-          - os: windows-latest
-            godot_version: 4.5.1-stable
-          - os: ubuntu-latest
-            godot_version: 4.4.1-stable
-          - os: ubuntu-latest
-            godot_version: 4.5.1-stable
+      matrix: ${{ fromJSON(needs.resolve-godot-support.outputs.nightly_matrix) }}
     uses: ./.github/workflows/reusable-godot-smoke.yml
     with:
       runner: ${{ matrix.os }}

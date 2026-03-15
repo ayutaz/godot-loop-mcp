@@ -12,6 +12,12 @@ Ensure-EmptyDirectory -Path $LogDir
 $stdoutPath = Join-Path $LogDir "server-stdout.log"
 $stderrPath = Join-Path $LogDir "server-stderr.log"
 $serverWorkdir = Join-Path $RepoRoot "packages/server"
+$serverEntrypoint = if (Test-Path -LiteralPath (Join-Path $serverWorkdir "dist/index.js")) {
+  @("dist/index.js")
+}
+else {
+  @("--experimental-strip-types", "src/index.ts")
+}
 $originalBridgeOnly = $env:GODOT_LOOP_MCP_BRIDGE_ONLY
 $originalLogDir = $env:GODOT_LOOP_MCP_LOG_DIR
 $env:GODOT_LOOP_MCP_BRIDGE_ONLY = "1"
@@ -20,7 +26,7 @@ $env:GODOT_LOOP_MCP_LOG_DIR = $LogDir
 $process = $null
 try {
   $process = Start-Process -FilePath "node" `
-    -ArgumentList @("--experimental-strip-types", "src/index.ts") `
+    -ArgumentList $serverEntrypoint `
     -WorkingDirectory $serverWorkdir `
     -RedirectStandardOutput $stdoutPath `
     -RedirectStandardError $stderrPath `

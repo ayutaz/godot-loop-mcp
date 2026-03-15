@@ -9,10 +9,10 @@
 
 | Workflow | Trigger | 目的 |
 | --- | --- | --- |
-| `ci.yml` | `pull_request`, `push` to `main` | server check, bridge smoke, verification smoke |
-| `nightly-compat.yml` | `schedule`, `workflow_dispatch` | OS / Godot version matrix の定期確認 |
+| `ci.yml` | `pull_request`, `push` to `main` | server check, bridge smoke, verification smoke, packaged install smoke |
+| `nightly-compat.yml` | `schedule`, `workflow_dispatch` | support floor + latest stable の OS / Godot version matrix 定期確認 |
 | `release.yml` | `push` tags: `v*`, `workflow_dispatch` | release packaging, GitHub Release, npm publish |
-| `reusable-server-check.yml` | reusable | Node setup, `typecheck`, `pack/publish dry-run`, bootstrap |
+| `reusable-server-check.yml` | reusable | Node setup, `typecheck`, `pack/publish dry-run`, bootstrap, release metadata validation |
 | `reusable-godot-smoke.yml` | reusable | Godot install, smoke 実行, artifact upload |
 
 ## 現在の配布モデル
@@ -40,22 +40,27 @@
 
 常設 job:
 
+- `resolve-godot-support`
 - `server-check`
 - `bridge-smoke`
 - `verification-smoke`
+- `packaged-install-smoke`
 
 責務:
 
+- support floor `4.4.1-stable` と current latest stable `4.x` の解決
 - `packages/server` の `typecheck`
 - `npm pack --dry-run`
 - `npm publish --dry-run`
 - Addon handshake smoke
 - verification surface の smoke
+- packaged Addon ZIP / server `.tgz` を clean workspace に入れ直した smoke
 
 失敗時 artifact:
 
 - server bootstrap logs
 - bridge smoke logs
+- packaged install smoke logs
 - `.godot/mcp`
 - `test-reports`
 
@@ -66,21 +71,24 @@
 - PR で常時回すには重い matrix を nightly で切り分ける
 - Godot minor version 差分の早期検知
 - OS 差分の早期検知
+- Godot binary download は GitHub release metadata + `SHA512-SUMS.txt` で検証し、retry を入れる
 
 現行 matrix:
 
 - `windows-latest`
 - `ubuntu-latest`
-- `4.4.1-stable`
-- `4.5.1-stable`
+- support floor: `4.4.1-stable`
+- latest stable: GitHub API から実行時に解決する current stable `4.x`
 
 ## `release.yml`
 
 tag push 時の job:
 
+- `resolve-godot-support`
 - `server-check`
 - `bridge-smoke`
 - `verification-smoke`
+- `packaged-install-smoke`
 - `package-addon`
 - `package-server`
 - `publish-github-release`
@@ -88,9 +96,10 @@ tag push 時の job:
 
 `workflow_dispatch` の扱い:
 
-- packaging / GitHub Release の再実行には使える
+- 指定した `tag` を checkout して packaging / GitHub Release の再実行に使う
 - `publish-npm` は走らない
 - npm publish の canonical path は `v*` tag push
+- `server-check` で `tag` と `packages/server/package.json` / `addons/godot_loop_mcp/plugin.cfg` / 公開 docs の version 整合を確認する
 
 ## npm publish
 
@@ -135,6 +144,7 @@ release source of truth:
 - tag 名
 - release notes
 - GitHub Actions artifacts
+- `packages/server/package.json` / `addons/godot_loop_mcp/plugin.cfg` version
 
 ## 権限方針
 
@@ -143,6 +153,7 @@ release source of truth:
 - workflow permissions は最小化
 - `id-token: write` は `publish-npm` のみ
 - content write は GitHub Release 作成 job のみ
+- privileged workflow で使う GitHub Actions は commit SHA で pin する
 
 environment:
 
@@ -155,6 +166,7 @@ environment:
 - external setting 修正後の npm publish は failed `publish-npm` rerun を優先
 - broken release artifact は `release.yml` の rerun で再生成
 - nightly matrix failure は PR block ではなく互換性調査として扱う
+- `workflow_dispatch` rerun でも branch head は使わず、指定 tag ref を再 checkout する
 
 ## 残る手動作業
 

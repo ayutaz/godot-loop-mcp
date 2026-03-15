@@ -21,6 +21,7 @@ It connects a Godot Editor addon and an external MCP server over a local TCP bri
 - Godot: `4.4+`
 - Node.js: `22.14.0+`
 - npm package: `@godot-loop-mcp/server`
+- CI coverage: `4.4.1-stable` + the current latest stable `4.x` on Windows, with nightly coverage on Ubuntu as well
 - Latest published version:
   - GitHub Release: `v0.1.3`
   - npm: `@godot-loop-mcp/server@0.1.3`
