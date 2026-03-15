@@ -103,7 +103,7 @@ async function main(): Promise<void> {
     },
     onDisconnect(reason) {
       logger.error("Lost connection to daemon.", { reason });
-      process.exit(1);
+      shutdown("daemon-disconnect");
     },
   });
 
@@ -167,10 +167,11 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
 
-    logger.info("Proxy shutting down.", { signal });
+    const exitCode = signal === "daemon-disconnect" ? 1 : 0;
+    logger.info("Proxy shutting down.", { signal, exitCode });
     daemonClient.close();
     (mcpServer?.close() ?? Promise.resolve()).finally(() => {
-      process.exit(0);
+      process.exit(exitCode);
     });
   }
 

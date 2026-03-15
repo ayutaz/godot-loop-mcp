@@ -23,7 +23,7 @@ import type { DaemonInfo, SessionReadyNotification } from "./types.ts";
 /* ------------------------------------------------------------------ */
 
 const config = loadConfig();
-const controlPort = numberFromEnv("GODOT_LOOP_MCP_CONTROL_PORT", (config as any).controlPort ?? 6011);
+const controlPort = numberFromEnv("GODOT_LOOP_MCP_CONTROL_PORT", config.controlPort);
 const logger = new Logger(path.join(config.logDir, "daemon.log"));
 const daemonInfoPath = path.join(config.logDir, "daemon.json");
 
@@ -84,6 +84,21 @@ const bridgeServer: Server = createServer((socket) => {
           sessionId: previousId,
           reason: "Session closed.",
         });
+      }
+
+      // If a fallback session was promoted, notify proxies so they re-enable tools.
+      if (wasActive && activeSession) {
+        const fallback = activeSession;
+        const notification: SessionReadyNotification = {
+          sessionId: fallback.getSessionId(),
+          addonProduct: fallback.getAddonProduct(),
+          securityLevel: fallback.getSecurityLevel(),
+          capabilities: fallback
+            .getAddonHello()
+            ?.capabilities.capabilities.filter((c) => c.availability === "enabled")
+            .map((c) => c.id),
+        };
+        controlServer.notifySessionReady(notification);
       }
     },
   );
@@ -198,6 +213,16 @@ function shutdown(signal: string): void {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => shutdown(signal));
 }
+
+// On Windows, SIGTERM never fires. Use the "exit" event as a last-resort
+// synchronous cleanup to ensure daemon.json is removed.
+process.on("exit", () => {
+  try {
+    fs.unlinkSync(daemonInfoPath);
+  } catch {
+    // Best-effort -- file may already be removed by shutdown().
+  }
+});
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */

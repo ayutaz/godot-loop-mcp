@@ -142,7 +142,12 @@ export class ControlServer {
 
     for (const message of messages) {
       if (isRequest(message)) {
-        void this.handleRequest(proxy, message);
+        this.handleRequest(proxy, message).catch((error) => {
+          this.logger.error("Unhandled error in control request handler.", {
+            proxyId: proxy.id,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
       } else {
         this.logger.warn("Ignoring non-request message from proxy.", {
           proxyId: proxy.id,

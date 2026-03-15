@@ -19,7 +19,7 @@ import type {
   BridgeNotification
 } from "../transport/types.ts";
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 
 export interface DaemonClientEvents {
   onSessionReady?: (notification: SessionReadyNotification) => void;
