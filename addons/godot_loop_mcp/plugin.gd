@@ -104,6 +104,10 @@ func _start_bridge() -> void:
 		_observation_service.set_runtime_state_provider(Callable(_workspace_service, "get_runtime_state"))
 	if _verification_service != null and _verification_service.has_method("set_runtime_state_provider"):
 		_verification_service.set_runtime_state_provider(Callable(_workspace_service, "get_runtime_state"))
+	if _workspace_service != null and _workspace_service.has_method("set_pause_callable"):
+		_workspace_service.set_pause_callable(Callable(_runtime_debugger_plugin, "send_pause"))
+	if _verification_service != null and _verification_service.has_method("set_runtime_debugger_plugin"):
+		_verification_service.set_runtime_debugger_plugin(_runtime_debugger_plugin)
 	_capability_registry = CapabilityRegistry.new()
 	_append_log("info", "Observation capabilities updated.", _observation_service.get_console_capture_status())
 	_bridge_client = BridgeClient.new(

@@ -11,6 +11,7 @@ var _editor_interface: EditorInterface
 var _workspace_root := ""
 var _runtime_debug_capture
 var _runtime_state_provider: Callable
+var _runtime_debugger_plugin
 
 
 func _init(editor_interface: EditorInterface, workspace_root: String, runtime_debug_capture) -> void:
@@ -23,12 +24,17 @@ func set_runtime_state_provider(provider: Callable) -> void:
 	_runtime_state_provider = provider
 
 
+func set_runtime_debugger_plugin(plugin) -> void:
+	_runtime_debugger_plugin = plugin
+
+
 func get_capability_overrides() -> Dictionary:
 	var adapter := _detect_test_adapter()
 	return {
 		"tests.run": "enabled" if not adapter.is_empty() else "disabled",
 		"screenshot.editor": "enabled" if _can_capture_screenshots() else "disabled",
 		"screenshot.runtime": "enabled" if _can_capture_screenshots() else "disabled",
+		"compile.check": "enabled",
 		"runtime.debug": (
 			"enabled"
 			if _runtime_debug_capture != null
@@ -36,7 +42,8 @@ func get_capability_overrides() -> Dictionary:
 			and _runtime_debug_capture.is_supported()
 			and ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry")
 			else "disabled"
-		)
+		),
+		"runtime.input": "enabled" if _runtime_debugger_plugin != null else "disabled"
 	}
 
 
@@ -52,10 +59,16 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			return _get_editor_screenshot(request_params)
 		"godot.screenshot.runtime":
 			return _get_running_scene_screenshot(request_params)
+		"godot.screenshot.annotated":
+			return _get_annotated_screenshot(request_params)
 		"godot.runtime.get_events":
 			return _get_runtime_events(request_params)
 		"godot.runtime.clear_events":
 			return _clear_runtime_events()
+		"godot.compile.check":
+			return _compile_check(request_params)
+		"godot.runtime.simulate_mouse":
+			return _simulate_mouse(request_params)
 		_:
 			return {"handled": false}
 
@@ -142,6 +155,152 @@ func _clear_runtime_events() -> Dictionary:
 			"clearedCount": int(_runtime_debug_capture.clear_events())
 		}
 	)
+
+
+func _compile_check(params: Dictionary) -> Dictionary:
+	var target_paths: Array = params.get("paths", [])
+	var filesystem := _editor_interface.get_resource_filesystem()
+	if filesystem == null:
+		return _error(-32005, "EditorFileSystem is unavailable.")
+
+	var root_directory = filesystem.get_filesystem()
+	if root_directory == null:
+		return _error(-32005, "EditorFileSystem root is unavailable.")
+
+	var gd_files: Array[String] = []
+	if target_paths.is_empty():
+		_collect_gd_files(root_directory, gd_files)
+	else:
+		for target_path in target_paths:
+			var normalized := str(target_path).strip_edges()
+			if not normalized.begins_with("res://"):
+				normalized = "res://" + normalized
+			if normalized.ends_with(".gd"):
+				gd_files.append(normalized)
+			else:
+				var sub_dir = filesystem.get_filesystem_path(normalized)
+				if sub_dir != null:
+					_collect_gd_files(sub_dir, gd_files)
+
+	var errors_count := 0
+	var files_checked := 0
+	var diagnostics: Array[Dictionary] = []
+
+	for file_path in gd_files:
+		var file := FileAccess.open(file_path, FileAccess.READ)
+		if file == null:
+			continue
+		var source := file.get_as_text()
+		file.close()
+		files_checked += 1
+
+		var script := GDScript.new()
+		script.source_code = source
+		var reload_error := script.reload()
+		if reload_error != OK:
+			errors_count += 1
+			diagnostics.append({
+				"path": file_path,
+				"severity": "error",
+				"errorCode": int(reload_error)
+			})
+
+	return _ok({
+		"errorsCount": errors_count,
+		"warningsCount": 0,
+		"filesChecked": files_checked,
+		"diagnostics": diagnostics
+	})
+
+
+func _collect_gd_files(directory, results: Array[String]) -> void:
+	if directory == null:
+		return
+
+	for file_index in range(directory.get_file_count()):
+		var file_path := str(directory.get_file_path(file_index))
+		if file_path.ends_with(".gd"):
+			results.append(file_path)
+
+	for subdir_index in range(directory.get_subdir_count()):
+		_collect_gd_files(directory.get_subdir(subdir_index), results)
+
+
+func _simulate_mouse(params: Dictionary) -> Dictionary:
+	var runtime_state := _get_runtime_state()
+	if not bool(runtime_state.get("isPlayingScene", false)):
+		return _error(-32004, "No scene is currently playing.")
+
+	if _runtime_debugger_plugin == null:
+		return _error(-32004, "Runtime debugger plugin is unavailable.")
+
+	var action := str(params.get("action", "click")).strip_edges()
+	var x := int(params.get("x", 0))
+	var y := int(params.get("y", 0))
+	var end_x := int(params.get("endX", x))
+	var end_y := int(params.get("endY", y))
+	var duration_ms := int(params.get("durationMs", 100))
+	var button := str(params.get("button", "left")).strip_edges()
+
+	var payload := {
+		"action": action,
+		"x": x,
+		"y": y,
+		"endX": end_x,
+		"endY": end_y,
+		"durationMs": duration_ms,
+		"button": button
+	}
+
+	var sessions := _runtime_debugger_plugin.get_sessions()
+	if sessions.is_empty():
+		return _error(-32004, "No active debugger session found.")
+
+	for session in sessions:
+		if session != null and session.is_active():
+			session.send_message("godot_loop_mcp:simulate_mouse", [payload])
+			break
+
+	return _ok({
+		"action": action,
+		"x": x,
+		"y": y,
+		"sent": true
+	})
+
+
+func _get_annotated_screenshot(params: Dictionary) -> Dictionary:
+	if not _can_capture_screenshots():
+		return _error(-32004, "Screenshots require a non-headless editor session.")
+
+	var screenshot_result := _capture_window_screenshot("annotated", params)
+	if screenshot_result.has("error"):
+		return screenshot_result
+
+	var result: Dictionary = screenshot_result.get("result", {})
+	var elements: Array[Dictionary] = []
+
+	if _runtime_debugger_plugin != null:
+		var sessions := _runtime_debugger_plugin.get_sessions()
+		for session in sessions:
+			if session != null and session.is_active():
+				session.send_message("godot_loop_mcp:enumerate_controls", [{}])
+				break
+
+		if _runtime_debug_capture != null and _runtime_debug_capture.has_method("get_events_payload"):
+			var events_payload: Dictionary = _runtime_debug_capture.get_events_payload(100)
+			var events: Array = events_payload.get("events", [])
+			for event in events:
+				if str(event.get("type", "")) == "enumerate_controls":
+					var data: Variant = event.get("data", {})
+					if typeof(data) == TYPE_DICTIONARY:
+						var controls: Array = data.get("controls", [])
+						for ctrl in controls:
+							if typeof(ctrl) == TYPE_DICTIONARY:
+								elements.append(ctrl)
+
+	result["elements"] = elements
+	return _ok(result)
 
 
 func _detect_test_adapter(params: Dictionary = {}) -> Dictionary:

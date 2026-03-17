@@ -176,6 +176,21 @@ function registerTools(
     }
   }, "godot.editor.focus_node");
 
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_menu_items", {
+    description: "List available editor menu items.",
+    inputSchema: {
+      menuPath: z.string().optional(),
+      filterText: z.string().optional()
+    }
+  }, "godot.editor.get_menu_items");
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "execute_menu_item", {
+    description: "Execute an editor menu item by its path.",
+    inputSchema: {
+      menuPath: z.string().min(1)
+    }
+  }, "godot.editor.execute_menu_item");
+
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_scene_tree", {
     description: "Return the current edited scene tree.",
     inputSchema: {
@@ -236,6 +251,13 @@ function registerTools(
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "stop_scene", {
     description: "Stop the currently playing scene."
   }, "godot.scene.stop");
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "pause_scene", {
+    description: "Pause or unpause the currently playing scene.",
+    inputSchema: {
+      paused: z.boolean().optional()
+    }
+  }, "godot.scene.pause");
 
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "add_node", {
     description: "Add a node to the current edited scene.",
@@ -306,6 +328,13 @@ function registerTools(
     }
   }, "godot.tests.run");
 
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "compile_project", {
+    description: "Check GDScript files in the project for compilation errors and warnings.",
+    inputSchema: {
+      paths: z.array(z.string().min(1)).max(200).optional()
+    }
+  }, "godot.compile.check");
+
   registerScreenshotTool(registry, server, config, auditLogger, getActiveSession, "get_editor_screenshot", {
     description: "Capture the current editor window as a PNG screenshot.",
     inputSchema: {
@@ -329,6 +358,22 @@ function registerTools(
     "godot.screenshot.runtime"
   );
 
+  registerScreenshotTool(
+    registry,
+    server,
+    config,
+    auditLogger,
+    getActiveSession,
+    "get_annotated_screenshot",
+    {
+      description: "Capture a screenshot of the running scene with interactive UI elements labeled and their coordinates returned.",
+      inputSchema: {
+        includeImage: z.boolean().optional()
+      }
+    },
+    "godot.screenshot.annotated"
+  );
+
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_runtime_debug_events", {
     description: "Read buffered runtime telemetry captured by EditorDebuggerPlugin.",
     inputSchema: {
@@ -339,6 +384,19 @@ function registerTools(
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "clear_runtime_debug_events", {
     description: "Clear buffered runtime telemetry events."
   }, "godot.runtime.clear_events");
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "simulate_mouse", {
+    description: "Simulate mouse input (click, drag, long-press) on a running scene.",
+    inputSchema: {
+      action: z.enum(["click", "drag", "long_press"]),
+      x: z.number(),
+      y: z.number(),
+      endX: z.number().optional(),
+      endY: z.number().optional(),
+      durationMs: z.number().int().min(100).max(10000).optional(),
+      button: z.enum(["left", "right", "middle"]).optional()
+    }
+  }, "godot.runtime.simulate_mouse");
 
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "execute_editor_script", {
     description: "Execute editor-side GDScript in Dangerous mode.",

@@ -127,6 +127,30 @@ func build_manifest(capability_overrides: Dictionary = {}, security_level: Strin
 				"security",
 				_capability_availability(capability_overrides, "danger.os_shell", "disabled", "Dangerous"),
 				"Executes an allowlisted shell command."
+			),
+			_capability(
+				"compile.check",
+				"tool",
+				_capability_availability(capability_overrides, "compile.check", "enabled", "ReadOnly"),
+				"Checks GDScript files for compilation errors and warnings."
+			),
+			_capability(
+				"runtime.input",
+				"tool",
+				_capability_availability(capability_overrides, "runtime.input", "disabled", "WorkspaceWrite"),
+				"Simulates mouse input on a running scene."
+			),
+			_capability(
+				"editor.menu.read",
+				"tool",
+				_capability_availability(capability_overrides, "editor.menu.read", "enabled", "ReadOnly"),
+				"Lists available editor menu items."
+			),
+			_capability(
+				"editor.menu.execute",
+				"tool",
+				_capability_availability(capability_overrides, "editor.menu.execute", "disabled", "Dangerous"),
+				"Executes an editor menu item by path."
 			)
 		]
 	}

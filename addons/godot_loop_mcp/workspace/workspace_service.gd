@@ -13,12 +13,17 @@ var _workspace_root := ""
 var _runtime_pid := -1
 var _runtime_scene_path := ""
 var _runtime_log_path := ""
+var _pause_callable: Callable
 
 
 func _init(editor_interface: EditorInterface, workspace_root: String) -> void:
 	_editor_interface = editor_interface
 	_workspace_root = workspace_root
 	_runtime_log_path = ProjectSettings.globalize_path(RUNTIME_LOG_RESOURCE_PATH)
+
+
+func set_pause_callable(callable: Callable) -> void:
+	_pause_callable = callable
 
 
 func dispose() -> void:
@@ -75,6 +80,8 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			return _play_scene(request_params)
 		"godot.scene.stop":
 			return _stop_scene()
+		"godot.scene.pause":
+			return _pause_scene(request_params)
 		"godot.scene.add_node":
 			return _add_node(request_params)
 		"godot.scene.move_node":
@@ -264,6 +271,28 @@ func _stop_scene() -> Dictionary:
 			"playingScenePath": str(_editor_interface.get_playing_scene())
 		}
 	)
+
+
+func _pause_scene(params: Dictionary) -> Dictionary:
+	var paused := bool(params.get("paused", true))
+
+	var editor_playing_scene := str(_editor_interface.get_playing_scene()).strip_edges()
+	if editor_playing_scene != "":
+		if not _pause_callable.is_valid():
+			return _error(-32010, "Pause requires runtime debugger support.")
+		_pause_callable.call(paused)
+		return _ok(
+			{
+				"paused": paused,
+				"playingScenePath": editor_playing_scene,
+				"runtimeMode": "editor-play"
+			}
+		)
+
+	if _runtime_pid > 0:
+		return _error(-32010, "Pausing an external runtime process is not supported.")
+
+	return _error(-32004, "No scene is currently playing.")
 
 
 func _add_node(params: Dictionary) -> Dictionary:
