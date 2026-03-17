@@ -221,7 +221,7 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
   {
     name: "compile_project",
     bridgeMethod: "godot.compile.check",
-    description: "Check GDScript files in the project for compilation errors and warnings.",
+    description: "Check GDScript files in the project for compilation errors.",
     requiredCapabilities: ["compile.check"]
   },
   {

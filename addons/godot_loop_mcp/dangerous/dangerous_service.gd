@@ -222,7 +222,7 @@ func _activate_in_popup(popup: PopupMenu, path_parts: PackedStringArray) -> Dict
 	var target_label := path_parts[0]
 	var is_last := path_parts.size() == 1
 
-	for i in popup.item_count:
+	for i in range(popup.get_item_count()):
 		var item_text := popup.get_item_text(i)
 		if item_text != target_label:
 			continue

@@ -90,7 +90,8 @@ func _on_editor_command(message: String, data: Array) -> bool:
 
 
 func _handle_pause_command(data: Array) -> void:
-	var paused: bool = data[0] if data.size() > 0 else true
+	var params: Dictionary = data[0] if data.size() > 0 and typeof(data[0]) == TYPE_DICTIONARY else {}
+	var paused: bool = bool(params.get("paused", true))
 	get_tree().paused = paused
 	_send_event("pause_result", {"paused": get_tree().paused})
 
@@ -208,7 +209,8 @@ func _index_to_label(index: int) -> String:
 	var i := index
 	while true:
 		label = char(65 + (i % 26)) + label
-		i = i / 26 - 1
+		@warning_ignore("integer_division")
+		i = int(i / 26) - 1
 		if i < 0:
 			break
 	return label

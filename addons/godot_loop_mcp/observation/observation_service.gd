@@ -40,7 +40,7 @@ func get_capability_overrides() -> Dictionary:
 		overrides = _console_capture.get_capability_overrides()
 	else:
 		overrides["editor.console.capture"] = "disabled"
-	overrides["editor.menu.read"] = "enabled"
+	overrides["editor.menu.read"] = "enabled" if DisplayServer.get_name() != "headless" else "disabled"
 	return overrides
 
 

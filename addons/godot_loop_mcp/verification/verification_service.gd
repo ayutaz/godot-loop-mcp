@@ -43,7 +43,15 @@ func get_capability_overrides() -> Dictionary:
 			and ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry")
 			else "disabled"
 		),
-		"runtime.input": "enabled" if _runtime_debugger_plugin != null else "disabled"
+		"runtime.input": (
+			"enabled"
+			if _runtime_debugger_plugin != null
+			and _runtime_debug_capture != null
+			and _runtime_debug_capture.has_method("is_supported")
+			and _runtime_debug_capture.is_supported()
+			and ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry")
+			else "disabled"
+		)
 	}
 
 
@@ -207,7 +215,6 @@ func _compile_check(params: Dictionary) -> Dictionary:
 
 	return _ok({
 		"errorsCount": errors_count,
-		"warningsCount": 0,
 		"filesChecked": files_checked,
 		"diagnostics": diagnostics
 	})
@@ -281,15 +288,17 @@ func _get_annotated_screenshot(params: Dictionary) -> Dictionary:
 
 		if _runtime_debug_capture != null and _runtime_debug_capture.has_method("get_events_payload"):
 			var events_payload: Dictionary = _runtime_debug_capture.get_events_payload(100)
-			var events: Array = events_payload.get("entries", [])
-			for event in events:
-				if str(event.get("type", "")) == "enumerate_controls":
-					var data: Variant = event.get("data", {})
-					if typeof(data) == TYPE_DICTIONARY:
-						var controls: Array = data.get("controls", [])
-						for ctrl in controls:
-							if typeof(ctrl) == TYPE_DICTIONARY:
-								elements.append(ctrl)
+			var entries: Array = events_payload.get("entries", [])
+			for entry in entries:
+				if str(entry.get("event", "")) == "controls_result":
+					var data_arr: Variant = entry.get("data", [])
+					if typeof(data_arr) == TYPE_ARRAY and data_arr.size() > 0:
+						var payload: Variant = data_arr[0]
+						if typeof(payload) == TYPE_DICTIONARY:
+							var ctrls: Array = payload.get("elements", [])
+							for ctrl in ctrls:
+								if typeof(ctrl) == TYPE_DICTIONARY:
+									elements.append(ctrl)
 
 	result["elements"] = elements
 	return _ok(result)

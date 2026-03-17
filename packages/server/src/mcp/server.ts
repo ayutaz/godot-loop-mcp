@@ -329,7 +329,7 @@ function registerTools(
   }, "godot.tests.run");
 
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "compile_project", {
-    description: "Check GDScript files in the project for compilation errors and warnings.",
+    description: "Check GDScript files in the project for compilation errors.",
     inputSchema: {
       paths: z.array(z.string().min(1)).max(200).optional()
     }
