@@ -252,7 +252,7 @@ func _simulate_mouse(params: Dictionary) -> Dictionary:
 		"button": button
 	}
 
-	var sessions := _runtime_debugger_plugin.get_sessions()
+	var sessions: Array = _runtime_debugger_plugin.get_sessions()
 	if sessions.is_empty():
 		return _error(-32004, "No active debugger session found.")
 
@@ -281,7 +281,7 @@ func _get_annotated_screenshot(params: Dictionary) -> Dictionary:
 	var elements: Array[Dictionary] = []
 
 	if _runtime_debugger_plugin != null:
-		var sessions := _runtime_debugger_plugin.get_sessions()
+		var sessions: Array = _runtime_debugger_plugin.get_sessions()
 		for session in sessions:
 			if session != null and session.is_active():
 				session.send_message("godot_loop_mcp:enumerate_controls", [{}])
