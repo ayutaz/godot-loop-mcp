@@ -3,6 +3,7 @@ extends RefCounted
 
 const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
 const EditorConsoleCapture = preload("res://addons/godot_loop_mcp/observation/editor_console_capture.gd")
+const MenuUtils = preload("res://addons/godot_loop_mcp/ui/menu_utils.gd")
 const ADDON_LOG_PATH := "res://.godot/mcp/addon.log"
 const RUNTIME_LOG_PATH := "res://.godot/mcp/runtime.log"
 const LOG_BACKEND_RUNTIME := "runtime-log-file"
@@ -34,9 +35,13 @@ func set_runtime_state_provider(provider: Callable) -> void:
 
 
 func get_capability_overrides() -> Dictionary:
+	var overrides := {}
 	if _console_capture != null and _console_capture.has_method("get_capability_overrides"):
-		return _console_capture.get_capability_overrides()
-	return {"editor.console.capture": "disabled"}
+		overrides = _console_capture.get_capability_overrides()
+	else:
+		overrides["editor.console.capture"] = "disabled"
+	overrides["editor.menu.read"] = "enabled" if DisplayServer.get_name() != "headless" else "disabled"
+	return overrides
 
 
 func get_console_capture_status() -> Dictionary:
@@ -75,6 +80,8 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
 				return _error(-32010, "clear_output_logs requires WorkspaceWrite security.")
 			return _clear_output_logs()
+		"godot.editor.get_menu_items":
+			return _get_menu_items(request_params)
 		_:
 			return {"handled": false}
 
@@ -358,6 +365,73 @@ func _resolve_runtime_log_path(runtime_state: Dictionary) -> String:
 	if runtime_log_path != "":
 		return runtime_log_path
 	return ProjectSettings.globalize_path(RUNTIME_LOG_PATH)
+
+
+func _get_menu_items(params: Dictionary) -> Dictionary:
+	var menu_path := str(params.get("menuPath", "")).strip_edges()
+	var filter_text := str(params.get("filterText", "")).strip_edges()
+
+	var base_control := _editor_interface.get_base_control()
+	if base_control == null:
+		return _error(-32006, "Editor base control is not available.")
+
+	var menu_bar := MenuUtils.find_menu_bar(base_control)
+	if menu_bar == null:
+		return _error(-32006, "MenuBar not found in editor UI.")
+
+	var all_items: Array[Dictionary] = []
+	var menu_count := menu_bar.get_menu_count()
+	for menu_index in range(menu_count):
+		var title := menu_bar.get_menu_title(menu_index)
+		var popup := menu_bar.get_menu_popup(menu_index)
+		if popup == null:
+			continue
+		var sub_items := _collect_menu_items(popup, title)
+		all_items.append_array(sub_items)
+
+	if menu_path != "":
+		var filtered: Array[Dictionary] = []
+		for item in all_items:
+			var item_path := str(item.get("path", ""))
+			if item_path == menu_path or item_path.begins_with(menu_path + "/"):
+				filtered.append(item)
+		all_items = filtered
+
+	if filter_text != "":
+		var filtered: Array[Dictionary] = []
+		for item in all_items:
+			var item_text := str(item.get("text", ""))
+			if item_text.containsn(filter_text):
+				filtered.append(item)
+		all_items = filtered
+
+	return _ok({"items": all_items, "count": all_items.size()})
+
+
+func _collect_menu_items(popup: PopupMenu, parent_path: String) -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	var item_count := popup.get_item_count()
+	for item_index in range(item_count):
+		var item_text := popup.get_item_text(item_index)
+		var is_separator := popup.is_item_separator(item_index)
+		var item_path := parent_path + "/" + item_text if item_text != "" else parent_path + "/"
+		items.append({
+			"path": item_path,
+			"text": item_text,
+			"id": popup.get_item_id(item_index),
+			"disabled": popup.is_item_disabled(item_index),
+			"isSeparator": is_separator
+		})
+
+		var submenu_name := popup.get_item_submenu(item_index)
+		if submenu_name != "":
+			for child_index in range(popup.get_child_count()):
+				var child := popup.get_child(child_index)
+				if child is PopupMenu and child.name == submenu_name:
+					var sub_items := _collect_menu_items(child as PopupMenu, item_path)
+					items.append_array(sub_items)
+					break
+	return items
 
 
 func _serialize_node(node: Node, max_depth: int, depth: int) -> Dictionary:

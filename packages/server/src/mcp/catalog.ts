@@ -163,6 +163,13 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     minimumSecurityLevel: WORKSPACE_WRITE
   },
   {
+    name: "pause_scene",
+    bridgeMethod: "godot.scene.pause",
+    description: "Pause or unpause the currently playing scene.",
+    requiredCapabilities: ["play.control"],
+    minimumSecurityLevel: WORKSPACE_WRITE
+  },
+  {
     name: "add_node",
     bridgeMethod: "godot.scene.add_node",
     description: "Add a node to the current edited scene.",
@@ -212,6 +219,12 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     minimumSecurityLevel: WORKSPACE_WRITE
   },
   {
+    name: "compile_project",
+    bridgeMethod: "godot.compile.check",
+    description: "Check GDScript files in the project for compilation errors.",
+    requiredCapabilities: ["compile.check"]
+  },
+  {
     name: "get_editor_screenshot",
     bridgeMethod: "godot.screenshot.editor",
     description: "Capture the current editor window as a PNG screenshot.",
@@ -221,6 +234,12 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     name: "get_running_scene_screenshot",
     bridgeMethod: "godot.screenshot.runtime",
     description: "Capture the current editor window while a scene is running.",
+    requiredCapabilities: ["screenshot.runtime"]
+  },
+  {
+    name: "get_annotated_screenshot",
+    bridgeMethod: "godot.screenshot.annotated",
+    description: "Capture a screenshot of the running scene with interactive UI elements labeled and their coordinates returned.",
     requiredCapabilities: ["screenshot.runtime"]
   },
   {
@@ -234,6 +253,13 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     bridgeMethod: "godot.runtime.clear_events",
     description: "Clear buffered runtime telemetry events.",
     requiredCapabilities: ["runtime.debug"],
+    minimumSecurityLevel: WORKSPACE_WRITE
+  },
+  {
+    name: "simulate_mouse",
+    bridgeMethod: "godot.runtime.simulate_mouse",
+    description: "Simulate mouse input (click, drag, long-press) on a running scene.",
+    requiredCapabilities: ["runtime.input"],
     minimumSecurityLevel: WORKSPACE_WRITE
   },
   {
@@ -255,6 +281,19 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     description: "Read editor console errors when available, otherwise fall back to .godot/mcp.",
     requiredCapabilities: LOG_READ_CAPABILITIES,
     exposeWhenNoSession: true
+  },
+  {
+    name: "get_menu_items",
+    bridgeMethod: "godot.editor.get_menu_items",
+    description: "List available editor menu items.",
+    requiredCapabilities: ["editor.menu.read"]
+  },
+  {
+    name: "execute_menu_item",
+    bridgeMethod: "godot.editor.execute_menu_item",
+    description: "Execute an editor menu item by its path.",
+    requiredCapabilities: ["editor.menu.execute"],
+    minimumSecurityLevel: DANGEROUS
   },
   {
     name: "execute_editor_script",

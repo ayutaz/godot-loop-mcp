@@ -2,6 +2,7 @@
 extends RefCounted
 
 const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
+const MenuUtils = preload("res://addons/godot_loop_mcp/ui/menu_utils.gd")
 
 var _editor_interface: EditorInterface
 var _workspace_root := ""
@@ -31,6 +32,11 @@ func get_capability_overrides() -> Dictionary:
 			"enabled"
 			if dangerous_enabled and not shell_commands.is_empty()
 			else "disabled"
+		),
+		"editor.menu.execute": (
+			"enabled"
+			if dangerous_enabled
+			else "disabled"
 		)
 	}
 
@@ -47,6 +53,8 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			return _filesystem_write_raw(request_params)
 		"godot.danger.os_shell":
 			return _os_shell(request_params)
+		"godot.editor.execute_menu_item":
+			return _execute_menu_item(request_params)
 		_:
 			return {"handled": false}
 
@@ -154,6 +162,97 @@ func _os_shell(params: Dictionary) -> Dictionary:
 			"output": _flatten_output(output)
 		}
 	)
+
+
+func _execute_menu_item(params: Dictionary) -> Dictionary:
+	if not PluginSettings.is_security_level_at_least("Dangerous"):
+		return _error(-32010, "execute_menu_item requires Dangerous security.")
+
+	var menu_path := str(params.get("menuPath", "")).strip_edges()
+	if menu_path == "":
+		return _error(-32602, "menuPath is required.")
+
+	var base_control := _editor_interface.get_base_control()
+	if base_control == null:
+		return _error(-32010, "Editor base control is not available.")
+
+	var menu_bar := MenuUtils.find_menu_bar(base_control)
+	if menu_bar == null:
+		return _error(-32010, "Editor MenuBar not found.")
+
+	var path_parts := menu_path.split("/", false)
+	if path_parts.is_empty():
+		return _error(-32602, "menuPath is empty after parsing.")
+
+	var activate_result := _find_and_activate_menu_item(menu_bar, path_parts)
+	if not bool(activate_result.get("found", false)):
+		return _error(
+			-32004,
+			str(activate_result.get("reason", "Menu item not found.")),
+			{"menuPath": menu_path}
+		)
+
+	return _ok({"executed": true, "menuPath": menu_path})
+
+
+func _find_and_activate_menu_item(menu_bar: MenuBar, path_parts: PackedStringArray) -> Dictionary:
+	var top_menu_name := path_parts[0]
+	var menu_index := -1
+
+	for i in menu_bar.get_menu_count():
+		if menu_bar.get_menu_title(i) == top_menu_name:
+			menu_index = i
+			break
+
+	if menu_index < 0:
+		return {"found": false, "reason": "Top-level menu '%s' not found." % top_menu_name}
+
+	var popup := menu_bar.get_menu_popup(menu_index)
+	if popup == null:
+		return {"found": false, "reason": "PopupMenu for '%s' is not available." % top_menu_name}
+
+	if path_parts.size() == 1:
+		return {"found": false, "reason": "menuPath must include at least a menu item name after the top-level menu."}
+
+	var remaining_parts := path_parts.slice(1)
+	return _activate_in_popup(popup, remaining_parts)
+
+
+func _activate_in_popup(popup: PopupMenu, path_parts: PackedStringArray) -> Dictionary:
+	var target_label := path_parts[0]
+	var is_last := path_parts.size() == 1
+
+	for i in range(popup.get_item_count()):
+		var item_text := popup.get_item_text(i)
+		if item_text != target_label:
+			continue
+
+		if is_last:
+			if popup.is_item_disabled(i):
+				return {"found": false, "reason": "Menu item '%s' is disabled." % target_label}
+			if popup.is_item_separator(i):
+				return {"found": false, "reason": "'%s' is a separator, not an activatable item." % target_label}
+			var item_id := popup.get_item_id(i)
+			popup.emit_signal("id_pressed", item_id)
+			return {"found": true}
+
+		var submenu_name := popup.get_item_submenu(i)
+		if submenu_name == "":
+			return {"found": false, "reason": "'%s' does not have a submenu." % target_label}
+
+		var submenu: PopupMenu = null
+		for child_index in popup.get_child_count():
+			var child := popup.get_child(child_index)
+			if child is PopupMenu and child.name == submenu_name:
+				submenu = child as PopupMenu
+				break
+
+		if submenu == null:
+			return {"found": false, "reason": "Submenu '%s' not found under '%s'." % [submenu_name, target_label]}
+
+		return _activate_in_popup(submenu, path_parts.slice(1))
+
+	return {"found": false, "reason": "Menu item '%s' not found." % target_label}
 
 
 func _require_allowed_write_path(raw_path: String) -> Dictionary:
