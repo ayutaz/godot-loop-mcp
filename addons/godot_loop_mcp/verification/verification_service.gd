@@ -252,14 +252,10 @@ func _simulate_mouse(params: Dictionary) -> Dictionary:
 		"button": button
 	}
 
-	var sessions: Array = _runtime_debugger_plugin.get_sessions()
-	if sessions.is_empty():
-		return _error(-32004, "No active debugger session found.")
+	if not _runtime_debugger_plugin.has_method("send_simulate_mouse"):
+		return _error(-32004, "Runtime debugger plugin does not support simulate_mouse.")
 
-	for session in sessions:
-		if session != null and session.is_active():
-			session.send_message("godot_loop_mcp:simulate_mouse", [payload])
-			break
+	_runtime_debugger_plugin.send_simulate_mouse(payload)
 
 	return _ok({
 		"action": action,
@@ -280,12 +276,8 @@ func _get_annotated_screenshot(params: Dictionary) -> Dictionary:
 	var result: Dictionary = screenshot_result.get("result", {})
 	var elements: Array[Dictionary] = []
 
-	if _runtime_debugger_plugin != null:
-		var sessions: Array = _runtime_debugger_plugin.get_sessions()
-		for session in sessions:
-			if session != null and session.is_active():
-				session.send_message("godot_loop_mcp:enumerate_controls", [{}])
-				break
+	if _runtime_debugger_plugin != null and _runtime_debugger_plugin.has_method("send_enumerate_controls"):
+		_runtime_debugger_plugin.send_enumerate_controls()
 
 		if _runtime_debug_capture != null and _runtime_debug_capture.has_method("get_events_payload"):
 			var events_payload: Dictionary = _runtime_debug_capture.get_events_payload(100)

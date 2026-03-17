@@ -8,7 +8,8 @@ func _ready() -> void:
 	if not EngineDebugger.is_active():
 		return
 
-	EngineDebugger.register_message_capture(CMD_PREFIX, _on_editor_command)
+	if not EngineDebugger.register_message_capture(CMD_PREFIX, _on_editor_command):
+		push_warning("[godot-loop-mcp] Failed to register message capture for '%s'" % CMD_PREFIX)
 
 	get_tree().node_added.connect(_on_node_added)
 	get_tree().node_removed.connect(_on_node_removed)

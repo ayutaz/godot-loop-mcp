@@ -2,6 +2,7 @@
 extends RefCounted
 
 const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
+const MenuUtils = preload("res://addons/godot_loop_mcp/ui/menu_utils.gd")
 
 var _editor_interface: EditorInterface
 var _workspace_root := ""
@@ -175,7 +176,7 @@ func _execute_menu_item(params: Dictionary) -> Dictionary:
 	if base_control == null:
 		return _error(-32010, "Editor base control is not available.")
 
-	var menu_bar := _find_menu_bar(base_control)
+	var menu_bar := MenuUtils.find_menu_bar(base_control)
 	if menu_bar == null:
 		return _error(-32010, "Editor MenuBar not found.")
 
@@ -192,20 +193,6 @@ func _execute_menu_item(params: Dictionary) -> Dictionary:
 		)
 
 	return _ok({"executed": true, "menuPath": menu_path})
-
-
-func _find_menu_bar(control: Control) -> MenuBar:
-	if control is MenuBar:
-		return control as MenuBar
-
-	for child_index in range(control.get_child_count()):
-		var child := control.get_child(child_index)
-		if child is Control:
-			var found := _find_menu_bar(child as Control)
-			if found != null:
-				return found
-
-	return null
 
 
 func _find_and_activate_menu_item(menu_bar: MenuBar, path_parts: PackedStringArray) -> Dictionary:
