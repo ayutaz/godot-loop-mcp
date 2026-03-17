@@ -142,15 +142,18 @@ func _handle_simulate_mouse_command(data: Array) -> void:
 			press_event.pressed = true
 			Input.parse_input_event(press_event)
 
-			await get_tree().create_timer(duration_ms / 1000.0).timeout
-
-			var release_event := InputEventMouseButton.new()
-			release_event.position = Vector2(x, y)
-			release_event.button_index = btn_index
-			release_event.pressed = false
-			Input.parse_input_event(release_event)
+			_deferred_long_press_release(Vector2(x, y), btn_index, duration_ms / 1000.0)
 
 	_send_event("mouse_result", {"action": action, "x": x, "y": y, "success": true})
+
+
+func _deferred_long_press_release(pos: Vector2, btn: MouseButton, delay: float) -> void:
+	await get_tree().create_timer(delay).timeout
+	var release_event := InputEventMouseButton.new()
+	release_event.position = pos
+	release_event.button_index = btn
+	release_event.pressed = false
+	Input.parse_input_event(release_event)
 
 
 func _handle_enumerate_controls_command(_data: Array) -> void:

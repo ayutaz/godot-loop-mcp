@@ -213,7 +213,7 @@ func _compile_check(params: Dictionary) -> Dictionary:
 	})
 
 
-func _collect_gd_files(directory, results: Array[String]) -> void:
+func _collect_gd_files(directory: EditorFileSystemDirectory, results: Array[String]) -> void:
 	if directory == null:
 		return
 
@@ -289,7 +289,7 @@ func _get_annotated_screenshot(params: Dictionary) -> Dictionary:
 
 		if _runtime_debug_capture != null and _runtime_debug_capture.has_method("get_events_payload"):
 			var events_payload: Dictionary = _runtime_debug_capture.get_events_payload(100)
-			var events: Array = events_payload.get("events", [])
+			var events: Array = events_payload.get("entries", [])
 			for event in events:
 				if str(event.get("type", "")) == "enumerate_controls":
 					var data: Variant = event.get("data", {})

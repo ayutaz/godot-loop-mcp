@@ -187,7 +187,7 @@ function registerTools(
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "execute_menu_item", {
     description: "Execute an editor menu item by its path.",
     inputSchema: {
-      menuPath: z.string().min(1)
+      menuPath: z.string().min(1).max(512)
     }
   }, "godot.editor.execute_menu_item");
 

@@ -198,7 +198,7 @@ func _find_menu_bar(control: Control) -> MenuBar:
 	if control is MenuBar:
 		return control as MenuBar
 
-	for child_index in control.get_child_count():
+	for child_index in range(control.get_child_count()):
 		var child := control.get_child(child_index)
 		if child is Control:
 			var found := _find_menu_bar(child as Control)
