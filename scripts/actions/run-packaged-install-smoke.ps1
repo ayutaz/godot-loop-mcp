@@ -70,10 +70,11 @@ if ($tempProjectFileContent -match '(?ms)^\[godot_loop_mcp\]\r?\n') {
     $tempProjectFileContent = [regex]::Replace($tempProjectFileContent, '(?m)^bridge/port=\d+\s*$', "bridge/port=$bridgePort")
   }
   else {
+    $sectionReplacement = '$1' + "bridge/port=$bridgePort" + [Environment]::NewLine
     $tempProjectFileContent = [regex]::Replace(
       $tempProjectFileContent,
       '(?ms)(^\[godot_loop_mcp\]\r?\n)',
-      ('$1bridge/port={0}{1}' -f $bridgePort, [Environment]::NewLine),
+      $sectionReplacement,
       1
     )
   }
@@ -168,9 +169,10 @@ try {
   Wait-FileContainsString -Path $serverStderrPath -Needle "Addon handshake completed." -TimeoutSeconds 20
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted."
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed."
+  $addonIdentityNeedle = '"addon":{"name":"godot-loop-mcp-addon","version":"' + $expectedAddonVersion + '"}'
   Assert-FileContainsString `
     -Path $serverFileLogPath `
-    -Needle ('"addon":{{"name":"godot-loop-mcp-addon","version":"{0}"}}' -f $expectedAddonVersion)
+    -Needle $addonIdentityNeedle
 }
 finally {
   if ($null -ne $godotProcess -and -not $godotProcess.HasExited) {
