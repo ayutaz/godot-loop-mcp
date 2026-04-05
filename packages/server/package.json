@@ -48,6 +48,7 @@
     "pack": "npm pack",
     "pack:dry-run": "npm pack --dry-run",
     "publish:dry-run": "npm publish --dry-run --access public",
+    "test:unit": "node --experimental-strip-types --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json",
     "smoke:m1": "node --experimental-strip-types src/dev/m1Smoke.ts",
     "smoke:m2": "node --experimental-strip-types src/dev/m2Smoke.ts",

@@ -13,6 +13,7 @@ It connects a Godot Editor addon and an external MCP server over a local TCP bri
 - project search, UID, selection, and focus tools
 - tests, prompts, and resource templates
 - capability-gated screenshot / runtime debug surface
+- running scene tree / node / audio playback inspection
 - security levels, audit log, and dangerous tool gating
 - distribution through GitHub Releases and npm
 
@@ -100,6 +101,13 @@ GUI-only validation:
 $env:GODOT_LOOP_MCP_GODOT_GUI_BIN = (Get-Command godot.exe).Source
 npm --prefix packages/server run smoke:m4:gui
 ```
+
+## Runtime verification
+
+- When you use `play_scene` in a GUI editor and configure `autoload/GodotLoopMcpRuntimeTelemetry`, you can use `get_running_scene_tree`, `get_running_node`, `get_running_node_property`, `wait_for_runtime_condition`, and `get_running_audio_players`
+- Runtime inspection surfaces including `get_running_scene_screenshot`, `get_runtime_debug_events`, and `simulate_mouse` require a GUI editor session
+- In a headless editor, `play_scene` launches an external runtime process, so MCP can primarily observe `.godot/mcp/runtime.log`
+- Godot processes started directly from the shell do not auto-attach to MCP runtime capture
 
 ## Documentation
 

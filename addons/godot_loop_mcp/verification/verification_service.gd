@@ -30,26 +30,16 @@ func set_runtime_debugger_plugin(plugin) -> void:
 
 func get_capability_overrides() -> Dictionary:
 	var adapter := _detect_test_adapter()
+	var runtime_debug_enabled := _is_runtime_debug_available()
 	return {
 		"tests.run": "enabled" if not adapter.is_empty() else "disabled",
 		"screenshot.editor": "enabled" if _can_capture_screenshots() else "disabled",
 		"screenshot.runtime": "enabled" if _can_capture_screenshots() else "disabled",
 		"compile.check": "enabled",
-		"runtime.debug": (
-			"enabled"
-			if _runtime_debug_capture != null
-			and _runtime_debug_capture.has_method("is_supported")
-			and _runtime_debug_capture.is_supported()
-			and ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry")
-			else "disabled"
-		),
+		"runtime.debug": "enabled" if runtime_debug_enabled else "disabled",
 		"runtime.input": (
 			"enabled"
-			if _runtime_debugger_plugin != null
-			and _runtime_debug_capture != null
-			and _runtime_debug_capture.has_method("is_supported")
-			and _runtime_debug_capture.is_supported()
-			and ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry")
+			if _runtime_debugger_plugin != null and runtime_debug_enabled
 			else "disabled"
 		)
 	}
@@ -73,6 +63,14 @@ func handle_request(method: String, params: Variant = {}) -> Dictionary:
 			return _get_runtime_events(request_params)
 		"godot.runtime.clear_events":
 			return _clear_runtime_events()
+		"godot.runtime.get_tree":
+			return _get_running_scene_tree()
+		"godot.runtime.get_node":
+			return _get_running_node(request_params)
+		"godot.runtime.get_node_property":
+			return _get_running_node_property(request_params)
+		"godot.runtime.get_audio_players":
+			return _get_running_audio_players(request_params)
 		"godot.compile.check":
 			return _compile_check(request_params)
 		"godot.runtime.simulate_mouse":
@@ -142,14 +140,14 @@ func _get_running_scene_screenshot(params: Dictionary) -> Dictionary:
 
 	var runtime_state := _get_runtime_state()
 	if not bool(runtime_state.get("isPlayingScene", false)):
-		return _error(-32004, "No scene is currently playing.")
+		return _runtime_observation_unavailable("No scene is currently playing.")
 
 	return _capture_window_screenshot("runtime", params)
 
 
 func _get_runtime_events(params: Dictionary) -> Dictionary:
 	if _runtime_debug_capture == null or not _runtime_debug_capture.has_method("get_events_payload"):
-		return _error(-32004, "Runtime debug capture is unavailable.")
+		return _runtime_observation_unavailable("Runtime debug capture is unavailable.")
 	return _ok(_runtime_debug_capture.get_events_payload(int(params.get("limit", 100))))
 
 
@@ -157,10 +155,125 @@ func _clear_runtime_events() -> Dictionary:
 	if not PluginSettings.is_security_level_at_least("WorkspaceWrite"):
 		return _error(-32010, "Clearing runtime events requires WorkspaceWrite security.")
 	if _runtime_debug_capture == null or not _runtime_debug_capture.has_method("clear_events"):
-		return _error(-32004, "Runtime debug capture is unavailable.")
+		return _runtime_observation_unavailable("Runtime debug capture is unavailable.")
 	return _ok(
 		{
 			"clearedCount": int(_runtime_debug_capture.clear_events())
+		}
+	)
+
+
+func _get_running_scene_tree() -> Dictionary:
+	var snapshot_result := _get_runtime_snapshot_or_error()
+	if bool(snapshot_result.get("hasError", false)):
+		return snapshot_result.get("error", _runtime_observation_unavailable("Runtime snapshot is unavailable."))
+
+	var snapshot: Dictionary = snapshot_result.get("snapshot", {})
+	return _ok(
+		{
+			"currentScenePath": snapshot.get("currentScenePath", ""),
+			"rootPath": snapshot.get("rootPath", ""),
+			"nodeCount": int(snapshot.get("nodeCount", 0)),
+			"capturedAt": snapshot.get("capturedAt", ""),
+			"tree": _build_running_scene_tree(snapshot)
+		}
+	)
+
+
+func _get_running_node(params: Dictionary) -> Dictionary:
+	var node_path := str(params.get("nodePath", "")).strip_edges()
+	if node_path == "":
+		return _error(-32602, "nodePath is required.")
+
+	var snapshot_result := _get_runtime_snapshot_or_error()
+	if bool(snapshot_result.get("hasError", false)):
+		return snapshot_result.get("error", _runtime_observation_unavailable("Runtime snapshot is unavailable."))
+
+	var snapshot: Dictionary = snapshot_result.get("snapshot", {})
+	var node_payload := _find_snapshot_node(snapshot, node_path)
+	if node_payload.is_empty():
+		return _error(
+			-32004,
+			"nodePath could not be resolved in the running scene.",
+			{
+				"nodePath": node_path,
+				"capturedAt": snapshot.get("capturedAt", "")
+			}
+		)
+
+	return _ok(
+		{
+			"nodePath": node_path,
+			"capturedAt": snapshot.get("capturedAt", ""),
+			"node": node_payload
+		}
+	)
+
+
+func _get_running_node_property(params: Dictionary) -> Dictionary:
+	var node_path := str(params.get("nodePath", "")).strip_edges()
+	var property_path := str(params.get("propertyPath", "")).strip_edges()
+	if node_path == "" or property_path == "":
+		return _error(-32602, "nodePath and propertyPath are required.")
+
+	var snapshot_result := _get_runtime_snapshot_or_error()
+	if bool(snapshot_result.get("hasError", false)):
+		return snapshot_result.get("error", _runtime_observation_unavailable("Runtime snapshot is unavailable."))
+
+	var snapshot: Dictionary = snapshot_result.get("snapshot", {})
+	var node_payload := _find_snapshot_node(snapshot, node_path)
+	if node_payload.is_empty():
+		return _error(
+			-32004,
+			"nodePath could not be resolved in the running scene.",
+			{
+				"nodePath": node_path,
+				"capturedAt": snapshot.get("capturedAt", "")
+			}
+		)
+
+	var lookup := _lookup_node_value(node_payload, property_path)
+	if not bool(lookup.get("found", false)):
+		return _error(
+			-32004,
+			"propertyPath could not be resolved from the runtime snapshot.",
+			{
+				"nodePath": node_path,
+				"propertyPath": property_path,
+				"capturedAt": snapshot.get("capturedAt", "")
+			}
+		)
+
+	return _ok(
+		{
+			"nodePath": node_path,
+			"propertyPath": property_path,
+			"value": lookup.get("value", null),
+			"capturedAt": snapshot.get("capturedAt", "")
+		}
+	)
+
+
+func _get_running_audio_players(params: Dictionary) -> Dictionary:
+	var audio_result := _get_audio_snapshot_or_error()
+	if bool(audio_result.get("hasError", false)):
+		return audio_result.get("error", _runtime_observation_unavailable("Runtime audio snapshot is unavailable."))
+
+	var audio_snapshot: Dictionary = audio_result.get("snapshot", {})
+	var playing_only := bool(params.get("playingOnly", false))
+	var players: Array[Dictionary] = []
+	for player in _snapshot_entries_to_array(audio_snapshot.get("players", [])):
+		if playing_only and not bool(player.get("playing", false)):
+			continue
+		players.append(player)
+
+	return _ok(
+		{
+			"currentScenePath": audio_snapshot.get("currentScenePath", ""),
+			"capturedAt": audio_snapshot.get("capturedAt", ""),
+			"playerCount": players.size(),
+			"activePlayerCount": _count_active_audio_players(players),
+			"players": players
 		}
 	)
 
@@ -236,10 +349,10 @@ func _collect_gd_files(directory: EditorFileSystemDirectory, results: Array[Stri
 func _simulate_mouse(params: Dictionary) -> Dictionary:
 	var runtime_state := _get_runtime_state()
 	if not bool(runtime_state.get("isPlayingScene", false)):
-		return _error(-32004, "No scene is currently playing.")
+		return _runtime_observation_unavailable("No scene is currently playing.")
 
 	if _runtime_debugger_plugin == null:
-		return _error(-32004, "Runtime debugger plugin is unavailable.")
+		return _runtime_observation_unavailable("Runtime debugger plugin is unavailable.")
 
 	var action := str(params.get("action", "click")).strip_edges()
 	var x := int(params.get("x", 0))
@@ -260,7 +373,7 @@ func _simulate_mouse(params: Dictionary) -> Dictionary:
 	}
 
 	if not _runtime_debugger_plugin.has_method("send_simulate_mouse"):
-		return _error(-32004, "Runtime debugger plugin does not support simulate_mouse.")
+		return _runtime_observation_unavailable("Runtime debugger plugin does not support simulate_mouse.")
 
 	_runtime_debugger_plugin.send_simulate_mouse(payload)
 
@@ -513,6 +626,182 @@ func _get_runtime_state() -> Dictionary:
 		"playingScenePath": "",
 		"runtimeMode": ""
 	}
+
+
+func _is_runtime_debug_available() -> bool:
+	return (
+		_runtime_debug_capture != null
+		and _runtime_debug_capture.has_method("is_supported")
+		and _runtime_debug_capture.is_supported()
+		and ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry")
+	)
+
+
+func _get_runtime_snapshot_or_error() -> Dictionary:
+	var runtime_state := _get_runtime_state()
+	if not bool(runtime_state.get("isPlayingScene", false)):
+		return {
+			"hasError": true,
+			"error": _runtime_observation_unavailable("No scene is currently playing.")
+		}
+
+	if _runtime_debug_capture == null or not _runtime_debug_capture.has_method("get_latest_runtime_snapshot"):
+		return {
+			"hasError": true,
+			"error": _runtime_observation_unavailable("Runtime inspection snapshot is unavailable.")
+		}
+
+	var snapshot: Dictionary = _runtime_debug_capture.get_latest_runtime_snapshot()
+	if snapshot.is_empty():
+		return {
+			"hasError": true,
+			"error": _runtime_observation_unavailable("Runtime snapshot has not arrived yet.")
+		}
+
+	return {
+		"hasError": false,
+		"snapshot": snapshot
+	}
+
+
+func _get_audio_snapshot_or_error() -> Dictionary:
+	var runtime_state := _get_runtime_state()
+	if not bool(runtime_state.get("isPlayingScene", false)):
+		return {
+			"hasError": true,
+			"error": _runtime_observation_unavailable("No scene is currently playing.")
+		}
+
+	if _runtime_debug_capture == null or not _runtime_debug_capture.has_method("get_latest_audio_snapshot"):
+		return {
+			"hasError": true,
+			"error": _runtime_observation_unavailable("Runtime audio snapshot is unavailable.")
+		}
+
+	var snapshot: Dictionary = _runtime_debug_capture.get_latest_audio_snapshot()
+	if snapshot.is_empty():
+		return {
+			"hasError": true,
+			"error": _runtime_observation_unavailable("Runtime audio snapshot has not arrived yet.")
+		}
+
+	return {
+		"hasError": false,
+		"snapshot": snapshot
+	}
+
+
+func _runtime_observation_unavailable(reason: String) -> Dictionary:
+	return _error(
+		-32004,
+		reason,
+		{
+			"displayServer": DisplayServer.get_name(),
+			"runtimeState": _get_runtime_state(),
+			"runtimeDebugSupported": (
+				_runtime_debug_capture != null
+				and _runtime_debug_capture.has_method("is_supported")
+				and _runtime_debug_capture.is_supported()
+			),
+			"telemetryAutoloadConfigured": ProjectSettings.has_setting("autoload/GodotLoopMcpRuntimeTelemetry"),
+			"hint": "Runtime inspection tools require a GUI editor session, a scene started with play_scene, and the GodotLoopMcpRuntimeTelemetry autoload."
+		}
+	)
+
+
+func _build_running_scene_tree(snapshot: Dictionary) -> Dictionary:
+	var nodes := _snapshot_entries_to_array(snapshot.get("nodes", []))
+	var indexed_nodes := {}
+	var root_path := str(snapshot.get("rootPath", ""))
+
+	for node_payload in nodes:
+		var path := str(node_payload.get("path", ""))
+		if path == "":
+			continue
+
+		indexed_nodes[path] = {
+			"path": path,
+			"name": node_payload.get("name", ""),
+			"type": node_payload.get("type", ""),
+			"parentPath": node_payload.get("parentPath", ""),
+			"properties": node_payload.get("properties", {}),
+			"children": []
+		}
+
+	for path in indexed_nodes.keys():
+		var node: Dictionary = indexed_nodes[path]
+		var parent_path := str(node.get("parentPath", ""))
+		if parent_path != "" and indexed_nodes.has(parent_path):
+			var parent_node: Dictionary = indexed_nodes[parent_path]
+			var children: Array = parent_node.get("children", [])
+			children.append(node)
+			parent_node["children"] = children
+			indexed_nodes[parent_path] = parent_node
+
+	if root_path != "" and indexed_nodes.has(root_path):
+		return indexed_nodes[root_path]
+
+	return {}
+
+
+func _find_snapshot_node(snapshot: Dictionary, node_path: String) -> Dictionary:
+	for node_payload in _snapshot_entries_to_array(snapshot.get("nodes", [])):
+		if str(node_payload.get("path", "")) == node_path:
+			return node_payload
+	return {}
+
+
+func _lookup_node_value(node_payload: Dictionary, property_path: String) -> Dictionary:
+	if node_payload.has(property_path):
+		return {
+			"found": true,
+			"value": node_payload.get(property_path, null)
+		}
+
+	var segments := property_path.split(".", false)
+	if segments.is_empty():
+		return {"found": false}
+
+	var current: Variant
+	if node_payload.has(segments[0]):
+		current = node_payload.get(segments[0], null)
+	else:
+		var properties: Dictionary = node_payload.get("properties", {})
+		if not properties.has(segments[0]):
+			return {"found": false}
+		current = properties.get(segments[0], null)
+
+	for index in range(1, segments.size()):
+		if typeof(current) != TYPE_DICTIONARY:
+			return {"found": false}
+		var current_dict: Dictionary = current
+		if not current_dict.has(segments[index]):
+			return {"found": false}
+		current = current_dict.get(segments[index], null)
+
+	return {
+		"found": true,
+		"value": current
+	}
+
+
+func _snapshot_entries_to_array(value: Variant) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if typeof(value) != TYPE_ARRAY:
+		return result
+
+	for entry in value:
+		if typeof(entry) == TYPE_DICTIONARY:
+			result.append(entry)
+	return result
+
+
+func _count_active_audio_players(players: Array[Dictionary]) -> int:
+	var count := 0
+	for player in players:
+		if bool(player.get("playing", false)):
+			count += 1
+	return count
 
 
 func _flatten_output(output: Array) -> String:

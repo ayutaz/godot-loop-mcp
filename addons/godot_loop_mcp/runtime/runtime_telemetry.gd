@@ -2,18 +2,49 @@ extends Node
 
 const MESSAGE_PREFIX := "godot_loop_mcp"
 const CMD_PREFIX := "godot_loop_mcp_cmd"
+const SNAPSHOT_INTERVAL_SEC := 0.25
+const TRACKED_PROPERTY_NAMES := [
+	"text",
+	"disabled",
+	"button_pressed",
+	"value",
+	"selected",
+	"visible",
+	"playing",
+	"stream_paused",
+	"bus",
+	"volume_db",
+	"autoplay"
+]
+
+var _snapshot_elapsed := 0.0
+var _last_runtime_snapshot_hash := ""
+var _last_audio_snapshot_hash := ""
 
 
 func _ready() -> void:
 	if not EngineDebugger.is_active():
 		return
 
-	if not EngineDebugger.register_message_capture(CMD_PREFIX, _on_editor_command):
-		push_warning("[godot-loop-mcp] Failed to register message capture for '%s'" % CMD_PREFIX)
+	EngineDebugger.register_message_capture(CMD_PREFIX, _on_editor_command)
 
 	get_tree().node_added.connect(_on_node_added)
 	get_tree().node_removed.connect(_on_node_removed)
+	set_process(true)
 	call_deferred("_emit_ready")
+
+
+func _process(delta: float) -> void:
+	if not EngineDebugger.is_active():
+		return
+
+	_snapshot_elapsed += delta
+	if _snapshot_elapsed < SNAPSHOT_INTERVAL_SEC:
+		return
+
+	_snapshot_elapsed = 0.0
+	_emit_runtime_snapshot_if_changed("poll")
+	_emit_audio_snapshot_if_changed("poll")
 
 
 func _exit_tree() -> void:
@@ -35,6 +66,8 @@ func _emit_ready() -> void:
 			"nodeCount": get_tree().get_node_count()
 		}
 	)
+	_emit_runtime_snapshot_if_changed("ready")
+	_emit_audio_snapshot_if_changed("ready")
 
 
 func _on_node_added(node: Node) -> void:
@@ -48,6 +81,8 @@ func _on_node_added(node: Node) -> void:
 			"type": node.get_class()
 		}
 	)
+	call_deferred("_emit_runtime_snapshot_if_changed", "node_added")
+	call_deferred("_emit_audio_snapshot_if_changed", "node_added")
 
 
 func _on_node_removed(node: Node) -> void:
@@ -60,6 +95,178 @@ func _on_node_removed(node: Node) -> void:
 			"type": node.get_class()
 		}
 	)
+	call_deferred("_emit_runtime_snapshot_if_changed", "node_removed")
+	call_deferred("_emit_audio_snapshot_if_changed", "node_removed")
+
+
+func _emit_runtime_snapshot_if_changed(reason: String) -> void:
+	var payload := _build_runtime_snapshot(reason)
+	var serialized := JSON.stringify(payload)
+	if serialized == _last_runtime_snapshot_hash:
+		return
+
+	_last_runtime_snapshot_hash = serialized
+	_send_event("runtime_snapshot", payload)
+
+
+func _emit_audio_snapshot_if_changed(reason: String) -> void:
+	var payload := _build_audio_snapshot(reason)
+	var serialized := JSON.stringify(payload)
+	if serialized == _last_audio_snapshot_hash:
+		return
+
+	_last_audio_snapshot_hash = serialized
+	_send_event("audio_players_snapshot", payload)
+
+
+func _build_runtime_snapshot(reason: String) -> Dictionary:
+	var root := get_tree().current_scene
+	var nodes: Array[Dictionary] = []
+	if root != null:
+		_collect_runtime_nodes(root, "", nodes)
+
+	return {
+		"reason": reason,
+		"capturedAt": Time.get_datetime_string_from_system(true),
+		"currentScenePath": _get_current_scene_path(),
+		"rootPath": str(root.get_path()) if root != null else "",
+		"nodeCount": nodes.size(),
+		"nodes": nodes
+	}
+
+
+func _build_audio_snapshot(reason: String) -> Dictionary:
+	var root := get_tree().current_scene
+	var players: Array[Dictionary] = []
+	if root != null:
+		_collect_audio_players(root, players)
+
+	return {
+		"reason": reason,
+		"capturedAt": Time.get_datetime_string_from_system(true),
+		"currentScenePath": _get_current_scene_path(),
+		"players": players,
+		"playerCount": players.size(),
+		"activePlayerCount": _count_active_players(players)
+	}
+
+
+func _collect_runtime_nodes(node: Node, parent_path: String, results: Array[Dictionary]) -> void:
+	var node_path := str(node.get_path())
+	results.append(
+		{
+			"path": node_path,
+			"parentPath": parent_path,
+			"name": node.name,
+			"type": node.get_class(),
+			"childCount": node.get_child_count(),
+			"properties": _collect_node_properties(node)
+		}
+	)
+
+	for child in node.get_children():
+		if child is Node:
+			_collect_runtime_nodes(child, node_path, results)
+
+
+func _collect_node_properties(node: Node) -> Dictionary:
+	var properties := {}
+
+	for property_name in TRACKED_PROPERTY_NAMES:
+		if _has_property(node, property_name):
+			properties[property_name] = _serialize_variant(node.get(property_name))
+
+	if node is CanvasItem:
+		var canvas_item := node as CanvasItem
+		properties["global_position"] = _serialize_variant(canvas_item.global_position)
+
+	if node is Control:
+		var control := node as Control
+		properties["size"] = _serialize_variant(control.size)
+
+	return properties
+
+
+func _collect_audio_players(node: Node, results: Array[Dictionary]) -> void:
+	if _is_audio_player(node):
+		results.append(_build_audio_player_payload(node))
+
+	for child in node.get_children():
+		if child is Node:
+			_collect_audio_players(child, results)
+
+
+func _build_audio_player_payload(node: Node) -> Dictionary:
+	var stream: Variant = node.get("stream") if _has_property(node, "stream") else null
+	var playback_position := 0.0
+	if node.has_method("get_playback_position"):
+		playback_position = float(node.call("get_playback_position"))
+
+	var length_sec := 0.0
+	if stream != null and stream.has_method("get_length"):
+		length_sec = float(stream.call("get_length"))
+
+	var payload := {
+		"path": str(node.get_path()),
+		"name": node.name,
+		"type": node.get_class(),
+		"playing": bool(node.get("playing")) if _has_property(node, "playing") else false,
+		"streamPaused": bool(node.get("stream_paused")) if _has_property(node, "stream_paused") else false,
+		"autoplay": bool(node.get("autoplay")) if _has_property(node, "autoplay") else false,
+		"bus": str(node.get("bus")) if _has_property(node, "bus") else "",
+		"volumeDb": float(node.get("volume_db")) if _has_property(node, "volume_db") else 0.0,
+		"playbackPosition": snappedf(playback_position, 0.001),
+		"lengthSec": snappedf(length_sec, 0.001),
+		"streamType": stream.get_class() if stream != null else "",
+		"streamResourcePath": str(stream.resource_path) if stream is Resource else ""
+	}
+
+	return payload
+
+
+func _count_active_players(players: Array[Dictionary]) -> int:
+	var count := 0
+	for player in players:
+		if bool(player.get("playing", false)):
+			count += 1
+	return count
+
+
+func _is_audio_player(node: Node) -> bool:
+	return node is AudioStreamPlayer or node is AudioStreamPlayer2D or node is AudioStreamPlayer3D
+
+
+func _has_property(target: Object, property_name: String) -> bool:
+	for property_info in target.get_property_list():
+		if str(property_info.get("name", "")) == property_name:
+			return true
+	return false
+
+
+func _serialize_variant(value: Variant) -> Variant:
+	match typeof(value):
+		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING:
+			return value
+		TYPE_VECTOR2:
+			return {"x": value.x, "y": value.y}
+		TYPE_VECTOR2I:
+			return {"x": value.x, "y": value.y}
+		TYPE_COLOR:
+			return {"r": value.r, "g": value.g, "b": value.b, "a": value.a}
+		TYPE_NODE_PATH, TYPE_STRING_NAME:
+			return str(value)
+		TYPE_ARRAY:
+			var serialized_array: Array = []
+			for entry in value:
+				serialized_array.append(_serialize_variant(entry))
+			return serialized_array
+		TYPE_DICTIONARY:
+			var serialized_dict := {}
+			for key in value.keys():
+				serialized_dict[str(key)] = _serialize_variant(value[key])
+			return serialized_dict
+		_:
+			return str(value)
 
 
 func _send_event(event_name: String, payload: Dictionary) -> void:
@@ -76,7 +283,7 @@ func _get_current_scene_path() -> String:
 
 
 # ---------------------------------------------------------------------------
-# Editor → Game command handling
+# Editor -> Game command handling
 # ---------------------------------------------------------------------------
 
 func _on_editor_command(message: String, data: Array) -> bool:
@@ -120,32 +327,34 @@ func _handle_simulate_mouse_command(data: Array) -> void:
 			Input.parse_input_event(release_event)
 
 		"drag":
-			var press_event := InputEventMouseButton.new()
-			press_event.position = Vector2(x, y)
-			press_event.button_index = btn_index
-			press_event.pressed = true
-			Input.parse_input_event(press_event)
+			var drag_press_event := InputEventMouseButton.new()
+			drag_press_event.position = Vector2(x, y)
+			drag_press_event.button_index = btn_index
+			drag_press_event.pressed = true
+			Input.parse_input_event(drag_press_event)
 
 			var motion_event := InputEventMouseMotion.new()
 			motion_event.position = Vector2(end_x, end_y)
 			motion_event.relative = Vector2(end_x - x, end_y - y)
 			Input.parse_input_event(motion_event)
 
-			var release_event := InputEventMouseButton.new()
-			release_event.position = Vector2(end_x, end_y)
-			release_event.button_index = btn_index
-			release_event.pressed = false
-			Input.parse_input_event(release_event)
+			var drag_release_event := InputEventMouseButton.new()
+			drag_release_event.position = Vector2(end_x, end_y)
+			drag_release_event.button_index = btn_index
+			drag_release_event.pressed = false
+			Input.parse_input_event(drag_release_event)
 
 		"long_press":
-			var press_event := InputEventMouseButton.new()
-			press_event.position = Vector2(x, y)
-			press_event.button_index = btn_index
-			press_event.pressed = true
-			Input.parse_input_event(press_event)
+			var long_press_event := InputEventMouseButton.new()
+			long_press_event.position = Vector2(x, y)
+			long_press_event.button_index = btn_index
+			long_press_event.pressed = true
+			Input.parse_input_event(long_press_event)
 
 			_deferred_long_press_release(Vector2(x, y), btn_index, duration_ms / 1000.0)
 
+	_emit_runtime_snapshot_if_changed("simulate_mouse")
+	_emit_audio_snapshot_if_changed("simulate_mouse")
 	_send_event("mouse_result", {"action": action, "x": x, "y": y, "success": true})
 
 
@@ -156,6 +365,8 @@ func _deferred_long_press_release(pos: Vector2, btn: MouseButton, delay: float) 
 	release_event.button_index = btn
 	release_event.pressed = false
 	Input.parse_input_event(release_event)
+	_emit_runtime_snapshot_if_changed("long_press_release")
+	_emit_audio_snapshot_if_changed("long_press_release")
 
 
 func _handle_enumerate_controls_command(_data: Array) -> void:

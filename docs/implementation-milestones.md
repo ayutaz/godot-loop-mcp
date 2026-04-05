@@ -32,6 +32,7 @@
 ## ドキュメント分担
 
 - 実装状況と quick reference: 本書
+- runtime 検証の課題整理: `docs/runtime-verification-gaps.md`
 - CI/CD と release 運用: `docs/github-actions-cicd-plan.md`
 - Asset Library handoff: `docs/asset-library-release-checklist.md`
 - 設計理由と参考ソース: `docs/godot-4.4-mcp-technical-research.md`
@@ -156,6 +157,11 @@ npm --prefix packages/server run smoke:m3
 - `get_editor_screenshot`
 - `get_running_scene_screenshot`
 - `runtime.debug`
+- `get_running_scene_tree`
+- `get_running_node`
+- `get_running_node_property`
+- `wait_for_runtime_condition`
+- `get_running_audio_players`
 
 確認:
 
@@ -178,6 +184,8 @@ npm --prefix packages/server run smoke:m4:gui
 
 - screenshot は GUI editor 前提
 - `runtime.debug` は GUI editor と telemetry autoload 前提
+- shell 直起動した Godot process は MCP runtime capture に自動接続されない
+- headless `play_scene` は外部 runtime process を起動し、runtime 観測は主に `.godot/mcp/runtime.log` に依存する
 
 ### M5
 

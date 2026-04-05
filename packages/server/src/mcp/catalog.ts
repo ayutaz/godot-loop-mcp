@@ -249,6 +249,35 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     requiredCapabilities: ["runtime.debug"]
   },
   {
+    name: "get_running_scene_tree",
+    bridgeMethod: "godot.runtime.get_tree",
+    description: "Return the latest captured tree for the currently running scene.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "get_running_node",
+    bridgeMethod: "godot.runtime.get_node",
+    description: "Read a node snapshot from the currently running scene by node path.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "get_running_node_property",
+    bridgeMethod: "godot.runtime.get_node_property",
+    description: "Read a property value from the latest running-scene node snapshot.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "wait_for_runtime_condition",
+    description: "Poll a running-scene node property until a predicate matches or times out.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "get_running_audio_players",
+    bridgeMethod: "godot.runtime.get_audio_players",
+    description: "Return the latest captured AudioStreamPlayer playback state from the running scene.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
     name: "clear_runtime_debug_events",
     bridgeMethod: "godot.runtime.clear_events",
     description: "Clear buffered runtime telemetry events.",
