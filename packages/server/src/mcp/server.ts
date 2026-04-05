@@ -1324,9 +1324,31 @@ function compareNumbers(
   rightValue: unknown,
   comparator: (left: number, right: number) => boolean
 ): boolean {
-  const left = typeof leftValue === "number" ? leftValue : Number(leftValue);
-  const right = typeof rightValue === "number" ? rightValue : Number(rightValue);
-  return Number.isFinite(left) && Number.isFinite(right) && comparator(left, right);
+  const left = toComparableNumber(leftValue);
+  const right = toComparableNumber(rightValue);
+  if (left === undefined || right === undefined) {
+    return false;
+  }
+
+  return comparator(left, right);
+}
+
+function toComparableNumber(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
 }
 
 function clampNumber(value: number, min: number, max: number, fallback: number): number {
@@ -1683,3 +1705,8 @@ function buildPromptEnvironmentSummary(
   const addonSecurity = session?.getSecurityLevel() ?? "ReadOnly";
   return `Security: server=${serverSecurityLevel}, addon=${addonSecurity}.`;
 }
+
+export const __test__ = {
+  matchesRuntimeCondition,
+  toComparableNumber
+};
