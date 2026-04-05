@@ -38,3 +38,18 @@ test("runtime inspection tools stay hidden without runtime.debug", () => {
   assert.ok(!catalog.tools.includes("get_running_audio_players"));
   assert.ok(!catalog.tools.includes("simulate_mouse"));
 });
+
+test("startup catalog stays stable before addon capabilities are known", () => {
+  const catalog = buildMcpCatalog({
+    securityLevel: "WorkspaceWrite"
+  });
+
+  assert.ok(catalog.tools.includes("get_project_info"));
+  assert.ok(catalog.tools.includes("search_project"));
+  assert.ok(catalog.tools.includes("create_scene"));
+  assert.ok(catalog.tools.includes("play_scene"));
+  assert.ok(catalog.tools.includes("get_running_node_property"));
+  assert.ok(catalog.tools.includes("wait_for_runtime_condition"));
+  assert.ok(catalog.tools.includes("get_running_audio_players"));
+  assert.ok(!catalog.tools.includes("execute_editor_script"));
+});

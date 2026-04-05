@@ -512,7 +512,7 @@ function isCatalogEntryEnabled(
   }
 
   if (!context) {
-    return entry.exposeWhenNoSession === true;
+    return true;
   }
 
   const requiredCapabilities = entry.requiredCapabilities ?? [];
@@ -526,14 +526,10 @@ function hasRequiredSecurity(requiredLevel: SecurityLevel, actualLevel: Security
 function createStaticExposureContext(
   capabilities?: CapabilityLookup,
   securityLevel: SecurityLevel = READ_ONLY
-): CatalogExposureContext | undefined {
-  if (!capabilities) {
-    return undefined;
-  }
-
+): CatalogExposureContext {
   return {
     hasCapability(capabilityId: string): boolean {
-      return capabilities.hasCapability(capabilityId);
+      return capabilities ? capabilities.hasCapability(capabilityId) : true;
     },
     getSecurityLevel(): SecurityLevel {
       return securityLevel;

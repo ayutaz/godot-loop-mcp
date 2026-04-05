@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import net from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -7,6 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
 
 const SMOKE_RELATIVE_DIR = "codex-smoke/m3";
+const DEFAULT_BRIDGE_PORT = 6010;
 
 async function main(): Promise<void> {
   const packageRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -24,13 +26,18 @@ async function main(): Promise<void> {
   const scriptPath = `res://${SMOKE_RELATIVE_DIR.replace(/\\/gu, "/")}/m3_smoke_agent.gd`;
   const uniqueToken = `m3-search-token-${Date.now()}`;
   const logDir = path.join(repoRoot, ".godot", "mcp");
+  const projectFilePath = path.join(repoRoot, "project.godot");
+  const originalProjectFile = fs.readFileSync(projectFilePath, "utf8");
+  const bridgePort = await resolveBridgePort();
+  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, bridgePort), "utf8");
   const transport = new StdioClientTransport({
     command: "node",
     args: ["--experimental-strip-types", "src/index.ts"],
     cwd: packageRoot,
     env: {
       ...process.env,
-      GODOT_LOOP_MCP_LOG_DIR: logDir
+      GODOT_LOOP_MCP_LOG_DIR: logDir,
+      GODOT_LOOP_MCP_PORT: String(bridgePort)
     },
     stderr: "inherit"
   });
@@ -44,15 +51,20 @@ async function main(): Promise<void> {
   try {
     await client.connect(transport);
 
-    console.error("Checking pre-session dynamic catalog...");
+    console.error("Checking stable startup catalog...");
     const initialTools = await client.listTools();
     assertContains(initialTools.tools.map((tool) => tool.name), "get_output_logs", "initial tool list");
-    assertNotContains(initialTools.tools.map((tool) => tool.name), "get_project_info", "initial tool list");
-    assertNotContains(initialTools.tools.map((tool) => tool.name), "search_project", "initial tool list");
+    assertContains(initialTools.tools.map((tool) => tool.name), "get_project_info", "initial tool list");
+    assertContains(initialTools.tools.map((tool) => tool.name), "search_project", "initial tool list");
 
     const initialResources = await client.listResources();
     assertContains(initialResources.resources.map((resource) => resource.uri), "godot://errors/latest", "initial resource list");
-    assertNotContains(initialResources.resources.map((resource) => resource.uri), "godot://project/info", "initial resource list");
+    assertContains(initialResources.resources.map((resource) => resource.uri), "godot://project/info", "initial resource list");
+
+    const preSessionProjectInfo = await callToolJson(client, "get_project_info", undefined, { allowToolError: true });
+    if (!preSessionProjectInfo.isError || preSessionProjectInfo.payload.reason !== "No ready addon session.") {
+      throw new Error(`get_project_info must report no ready addon session before Godot starts: ${JSON.stringify(preSessionProjectInfo.payload)}`);
+    }
 
     godotProcess = spawn(
       godotBinaryPath,
@@ -67,8 +79,7 @@ async function main(): Promise<void> {
     assertString(projectInfo.projectName, "projectName");
     assertString(projectInfo.godotVersion, "godotVersion");
 
-    console.error("Checking post-session dynamic catalog...");
-    await waitForToolVisibility(client, "search_project", true, 15_000);
+    console.error("Checking post-session tool readiness...");
     const readyTools = await client.listTools();
     assertContains(readyTools.tools.map((tool) => tool.name), "search_project", "ready tool list");
     assertContains(readyTools.tools.map((tool) => tool.name), "get_uid", "ready tool list");
@@ -178,8 +189,81 @@ async function main(): Promise<void> {
     await client.close().catch(() => undefined);
     await transport.close().catch(() => undefined);
     await resumeProjectScanConflicts(scanQuarantineState).catch(() => undefined);
+    fs.writeFileSync(projectFilePath, originalProjectFile, "utf8");
     fs.rmSync(smokeDir, { recursive: true, force: true });
   }
+}
+
+async function resolveBridgePort(): Promise<number> {
+  const explicitPort = process.env.GODOT_LOOP_MCP_SMOKE_BRIDGE_PORT ?? process.env.GODOT_LOOP_MCP_PORT;
+  if (explicitPort) {
+    const parsed = Number(explicitPort);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      throw new Error(`Invalid bridge port override: ${explicitPort}`);
+    }
+    return parsed;
+  }
+
+  const preferredPort = await tryListenOnPort(DEFAULT_BRIDGE_PORT);
+  if (preferredPort !== undefined) {
+    return preferredPort;
+  }
+
+  const ephemeralPort = await tryListenOnPort(0);
+  if (ephemeralPort === undefined) {
+    throw new Error("Failed to allocate an available bridge port for the M3 smoke.");
+  }
+  return ephemeralPort;
+}
+
+function tryListenOnPort(port: number): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref();
+    server.once("error", () => {
+      resolve(undefined);
+    });
+    server.listen(port, "127.0.0.1", () => {
+      const address = server.address();
+      const resolvedPort = typeof address === "object" && address ? address.port : undefined;
+      server.close(() => resolve(resolvedPort));
+    });
+  });
+}
+
+function patchProjectFile(projectFile: string, bridgePort: number): string {
+  const newline = projectFile.includes("\r\n") ? "\r\n" : "\n";
+  const lines = projectFile.split(/\r?\n/u);
+  upsertSectionEntry(lines, "godot_loop_mcp", "bridge/port=", `bridge/port=${bridgePort}`);
+  return lines.join(newline);
+}
+
+function upsertSectionEntry(
+  lines: string[],
+  sectionName: string,
+  entryPrefix: string,
+  entryValue: string
+): void {
+  const header = `[${sectionName}]`;
+  const sectionIndex = lines.findIndex((line) => line.trim() === header);
+  if (sectionIndex >= 0) {
+    let cursor = sectionIndex + 1;
+    while (cursor < lines.length && !lines[cursor].startsWith("[")) {
+      if (lines[cursor].startsWith(entryPrefix)) {
+        lines[cursor] = entryValue;
+        return;
+      }
+      cursor += 1;
+    }
+    lines.splice(cursor, 0, entryValue);
+    return;
+  }
+
+  const needsTrailingNewline = lines.length > 0 && lines[lines.length - 1] !== "";
+  if (needsTrailingNewline) {
+    lines.push("");
+  }
+  lines.push(header, entryValue);
 }
 
 async function waitForToolVisibility(

@@ -1005,7 +1005,7 @@ function registerResourceTemplate(
 function syncCatalogExposure(
   registry: CatalogRegistry,
   serverSecurityLevel: SecurityLevel,
-  session?: AddonSession
+  _session?: AddonSession
 ): void {
   for (const toolEntry of MCP_TOOLS) {
     const registeredTool = registry.tools.get(toolEntry.name);
@@ -1013,7 +1013,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(toolEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(toolEntry, serverSecurityLevel);
     if (registeredTool.enabled !== shouldEnable) {
       shouldEnable ? registeredTool.enable() : registeredTool.disable();
     }
@@ -1025,7 +1025,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(resourceEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(resourceEntry, serverSecurityLevel);
     if (registeredResource.enabled !== shouldEnable) {
       shouldEnable ? registeredResource.enable() : registeredResource.disable();
     }
@@ -1037,7 +1037,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(promptEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(promptEntry, serverSecurityLevel);
     if (registeredPrompt.enabled !== shouldEnable) {
       shouldEnable ? registeredPrompt.enable() : registeredPrompt.disable();
     }
@@ -1049,7 +1049,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(templateEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(templateEntry, serverSecurityLevel);
     if (registeredTemplate.enabled !== shouldEnable) {
       shouldEnable ? registeredTemplate.enable() : registeredTemplate.disable();
     }
@@ -1387,20 +1387,34 @@ function toolAccessDenied(
     return undefined;
   }
 
-  if (shouldExposeEntry(entry, config.securityLevel, getActiveSession())) {
+  const session = getActiveSession();
+  if (isEntryUsable(entry, config.securityLevel, session)) {
     return undefined;
   }
 
   return formatToolError({
     available: false,
-    reason: "The tool is not enabled for the current addon capabilities or security level.",
+    reason:
+      !session && entry.exposeWhenNoSession !== true
+        ? "No ready addon session."
+        : "The tool is not enabled for the current addon capabilities or security level.",
     tool: toolName,
     serverSecurityLevel: config.securityLevel,
-    addonSecurityLevel: getActiveSession()?.getSecurityLevel() ?? "ReadOnly"
+    addonSecurityLevel: session?.getSecurityLevel() ?? "ReadOnly"
   });
 }
 
-function shouldExposeEntry(
+function shouldAdvertiseEntry(
+  entry: {
+    minimumSecurityLevel?: SecurityLevel;
+  },
+  serverSecurityLevel: SecurityLevel
+): boolean {
+  const requiredSecurityLevel = entry.minimumSecurityLevel ?? "ReadOnly";
+  return hasRequiredSecurity(requiredSecurityLevel, serverSecurityLevel);
+}
+
+function isEntryUsable(
   entry: {
     exposeWhenNoSession?: boolean;
     requiredCapabilities?: string[];

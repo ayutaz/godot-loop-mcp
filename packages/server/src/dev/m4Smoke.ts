@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -7,6 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
 
 const SMOKE_RELATIVE_DIR = "codex-smoke/m4";
+const DEFAULT_BRIDGE_PORT = 6010;
 
 async function main(): Promise<void> {
   const packageRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -23,13 +25,18 @@ async function main(): Promise<void> {
   const scriptPath = `res://${SMOKE_RELATIVE_DIR.replace(/\\/gu, "/")}/m4_smoke_agent.gd`;
   const logDir = path.join(repoRoot, ".godot", "mcp");
   const mockRunnerPath = path.join(repoRoot, "packages", "server", "src", "dev", "mockTestRunner.mjs");
+  const projectFilePath = path.join(repoRoot, "project.godot");
+  const originalProjectFile = fs.readFileSync(projectFilePath, "utf8");
+  const bridgePort = await resolveBridgePort();
+  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, bridgePort), "utf8");
   const transport = new StdioClientTransport({
     command: "node",
     args: ["--experimental-strip-types", "src/index.ts"],
     cwd: packageRoot,
     env: {
       ...process.env,
-      GODOT_LOOP_MCP_LOG_DIR: logDir
+      GODOT_LOOP_MCP_LOG_DIR: logDir,
+      GODOT_LOOP_MCP_PORT: String(bridgePort)
     },
     stderr: "inherit"
   });
@@ -64,9 +71,24 @@ async function main(): Promise<void> {
     assertNotContains(toolNames, "execute_editor_script", "tool list");
     assertNotContains(toolNames, "filesystem_write_raw", "tool list");
     assertNotContains(toolNames, "os_shell", "tool list");
-    assertNotContains(toolNames, "get_editor_screenshot", "tool list");
-    assertNotContains(toolNames, "get_running_scene_screenshot", "tool list");
-    assertNotContains(toolNames, "get_runtime_debug_events", "tool list");
+    assertContains(toolNames, "get_editor_screenshot", "tool list");
+    assertContains(toolNames, "get_running_scene_screenshot", "tool list");
+    assertContains(toolNames, "get_runtime_debug_events", "tool list");
+
+    const headlessScreenshot = await callToolJson(client, "get_editor_screenshot", undefined, { allowToolError: true });
+    if (!headlessScreenshot.isError || headlessScreenshot.payload.available !== false) {
+      throw new Error(`get_editor_screenshot must stay visible but reject headless sessions: ${JSON.stringify(headlessScreenshot.payload)}`);
+    }
+
+    const headlessRuntimeEvents = await callToolJson(
+      client,
+      "get_runtime_debug_events",
+      { limit: 5 },
+      { allowToolError: true }
+    );
+    if (!headlessRuntimeEvents.isError || headlessRuntimeEvents.payload.available !== false) {
+      throw new Error(`get_runtime_debug_events must stay visible but reject unavailable runtime capture: ${JSON.stringify(headlessRuntimeEvents.payload)}`);
+    }
 
     const prompts = await client.listPrompts();
     const promptNames = prompts.prompts.map((prompt) => prompt.name);
@@ -143,8 +165,81 @@ async function main(): Promise<void> {
     await client.close().catch(() => undefined);
     await transport.close().catch(() => undefined);
     await resumeProjectScanConflicts(scanQuarantineState).catch(() => undefined);
+    fs.writeFileSync(projectFilePath, originalProjectFile, "utf8");
     fs.rmSync(smokeDir, { recursive: true, force: true });
   }
+}
+
+async function resolveBridgePort(): Promise<number> {
+  const explicitPort = process.env.GODOT_LOOP_MCP_SMOKE_BRIDGE_PORT ?? process.env.GODOT_LOOP_MCP_PORT;
+  if (explicitPort) {
+    const parsed = Number(explicitPort);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      throw new Error(`Invalid bridge port override: ${explicitPort}`);
+    }
+    return parsed;
+  }
+
+  const preferredPort = await tryListenOnPort(DEFAULT_BRIDGE_PORT);
+  if (preferredPort !== undefined) {
+    return preferredPort;
+  }
+
+  const ephemeralPort = await tryListenOnPort(0);
+  if (ephemeralPort === undefined) {
+    throw new Error("Failed to allocate an available bridge port for the M4 smoke.");
+  }
+  return ephemeralPort;
+}
+
+function tryListenOnPort(port: number): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref();
+    server.once("error", () => {
+      resolve(undefined);
+    });
+    server.listen(port, "127.0.0.1", () => {
+      const address = server.address();
+      const resolvedPort = typeof address === "object" && address ? address.port : undefined;
+      server.close(() => resolve(resolvedPort));
+    });
+  });
+}
+
+function patchProjectFile(projectFile: string, bridgePort: number): string {
+  const newline = projectFile.includes("\r\n") ? "\r\n" : "\n";
+  const lines = projectFile.split(/\r?\n/u);
+  upsertSectionEntry(lines, "godot_loop_mcp", "bridge/port=", `bridge/port=${bridgePort}`);
+  return lines.join(newline);
+}
+
+function upsertSectionEntry(
+  lines: string[],
+  sectionName: string,
+  entryPrefix: string,
+  entryValue: string
+): void {
+  const header = `[${sectionName}]`;
+  const sectionIndex = lines.findIndex((line) => line.trim() === header);
+  if (sectionIndex >= 0) {
+    let cursor = sectionIndex + 1;
+    while (cursor < lines.length && !lines[cursor].startsWith("[")) {
+      if (lines[cursor].startsWith(entryPrefix)) {
+        lines[cursor] = entryValue;
+        return;
+      }
+      cursor += 1;
+    }
+    lines.splice(cursor, 0, entryValue);
+    return;
+  }
+
+  const needsTrailingNewline = lines.length > 0 && lines[lines.length - 1] !== "";
+  if (needsTrailingNewline) {
+    lines.push("");
+  }
+  lines.push(header, entryValue);
 }
 
 async function waitForProjectInfo(client: Client, timeoutMs: number): Promise<Record<string, unknown>> {
