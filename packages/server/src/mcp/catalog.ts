@@ -454,65 +454,65 @@ export function buildMcpCatalog(options: {
 export function listEnabledToolEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpToolCatalogEntry[] {
-  return MCP_TOOLS.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_TOOLS.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function listEnabledResourceEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpResourceCatalogEntry[] {
-  return MCP_RESOURCES.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_RESOURCES.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function listEnabledPromptEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpPromptCatalogEntry[] {
-  return MCP_PROMPTS.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_PROMPTS.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function listEnabledResourceTemplateEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpResourceTemplateCatalogEntry[] {
-  return MCP_RESOURCE_TEMPLATES.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_RESOURCE_TEMPLATES.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function isToolEntryEnabled(
   entry: McpToolCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 export function isResourceEntryEnabled(
   entry: McpResourceCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 export function isPromptEntryEnabled(
   entry: McpPromptCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 export function isResourceTemplateEntryEnabled(
   entry: McpResourceTemplateCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 function isCatalogEntryEnabled(
   entry: McpCatalogEntryBase,
-  context?: CatalogExposureContext
+  context: CatalogExposureContext
 ): boolean {
-  if (!hasRequiredSecurity(entry.minimumSecurityLevel ?? READ_ONLY, context?.getSecurityLevel() ?? READ_ONLY)) {
+  if (!hasRequiredSecurity(entry.minimumSecurityLevel ?? READ_ONLY, context.getSecurityLevel())) {
     return false;
-  }
-
-  if (!context) {
-    return true;
   }
 
   const requiredCapabilities = entry.requiredCapabilities ?? [];
@@ -535,4 +535,21 @@ function createStaticExposureContext(
       return securityLevel;
     }
   };
+}
+
+function createMinimalExposureContext(
+  securityLevel: SecurityLevel = READ_ONLY
+): CatalogExposureContext {
+  return {
+    hasCapability(): boolean {
+      return false;
+    },
+    getSecurityLevel(): SecurityLevel {
+      return securityLevel;
+    }
+  };
+}
+
+function resolveExposureContext(context?: CatalogExposureContext): CatalogExposureContext {
+  return context ?? createMinimalExposureContext();
 }

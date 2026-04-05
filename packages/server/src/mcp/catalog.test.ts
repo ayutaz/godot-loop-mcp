@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildMcpCatalog, type CapabilityLookup } from "./catalog.ts";
+import { buildMcpCatalog, listEnabledToolEntries, type CapabilityLookup } from "./catalog.ts";
 
 function createCapabilityLookup(capabilities: string[]): CapabilityLookup {
   const enabled = new Set(capabilities);
@@ -52,4 +52,15 @@ test("startup catalog stays stable before addon capabilities are known", () => {
   assert.ok(catalog.tools.includes("wait_for_runtime_condition"));
   assert.ok(catalog.tools.includes("get_running_audio_players"));
   assert.ok(!catalog.tools.includes("execute_editor_script"));
+});
+
+test("context-less catalog helpers fall back to a minimal safe exposure", () => {
+  const tools = listEnabledToolEntries().map((entry) => entry.name);
+
+  assert.ok(tools.includes("get_editor_state"));
+  assert.ok(!tools.includes("get_project_info"));
+  assert.ok(!tools.includes("search_project"));
+  assert.ok(!tools.includes("create_scene"));
+  assert.ok(!tools.includes("wait_for_runtime_condition"));
+  assert.ok(!tools.includes("execute_editor_script"));
 });

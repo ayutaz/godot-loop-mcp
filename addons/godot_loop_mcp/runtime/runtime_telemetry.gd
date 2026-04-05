@@ -2,8 +2,11 @@ extends Node
 
 const MESSAGE_PREFIX := "godot_loop_mcp"
 const CMD_PREFIX := "godot_loop_mcp_cmd"
-const DEFAULT_SNAPSHOT_INTERVAL_SEC := 0.25
+const DEFAULT_SNAPSHOT_INTERVAL_SEC := 0.5
 const SNAPSHOT_INTERVAL_SETTING := "godot_loop_mcp/runtime/snapshot_interval_sec"
+const DEFAULT_IDLE_SNAPSHOT_INTERVAL_SEC := 1.0
+const IDLE_SNAPSHOT_INTERVAL_SETTING := "godot_loop_mcp/runtime/idle_snapshot_interval_sec"
+const STABLE_POLL_THRESHOLD := 4
 const TRACKED_PROPERTY_NAMES := [
 	"text",
 	"disabled",
@@ -20,6 +23,8 @@ const TRACKED_PROPERTY_NAMES := [
 
 var _snapshot_elapsed := 0.0
 var _snapshot_interval_sec := DEFAULT_SNAPSHOT_INTERVAL_SEC
+var _idle_snapshot_interval_sec := DEFAULT_IDLE_SNAPSHOT_INTERVAL_SEC
+var _unchanged_poll_count := 0
 var _last_runtime_snapshot_hash := ""
 var _last_audio_snapshot_hash := ""
 var _property_presence_cache := {}
@@ -32,6 +37,10 @@ func _ready() -> void:
 	_snapshot_interval_sec = maxf(
 		float(ProjectSettings.get_setting(SNAPSHOT_INTERVAL_SETTING, DEFAULT_SNAPSHOT_INTERVAL_SEC)),
 		0.05
+	)
+	_idle_snapshot_interval_sec = maxf(
+		float(ProjectSettings.get_setting(IDLE_SNAPSHOT_INTERVAL_SETTING, DEFAULT_IDLE_SNAPSHOT_INTERVAL_SEC)),
+		_snapshot_interval_sec
 	)
 	var capture_registration: Variant = EngineDebugger.call("register_message_capture", CMD_PREFIX, _on_editor_command)
 	if typeof(capture_registration) == TYPE_BOOL and not bool(capture_registration):
@@ -48,12 +57,16 @@ func _process(delta: float) -> void:
 		return
 
 	_snapshot_elapsed += delta
-	if _snapshot_elapsed < _snapshot_interval_sec:
+	if _snapshot_elapsed < _get_current_snapshot_interval_sec():
 		return
 
 	_snapshot_elapsed = 0.0
-	_emit_runtime_snapshot_if_changed("poll")
-	_emit_audio_snapshot_if_changed("poll")
+	var runtime_changed := _emit_runtime_snapshot_if_changed("poll")
+	var audio_changed := _emit_audio_snapshot_if_changed("poll")
+	if runtime_changed or audio_changed:
+		_unchanged_poll_count = 0
+	else:
+		_unchanged_poll_count = min(_unchanged_poll_count + 1, STABLE_POLL_THRESHOLD)
 
 
 func _exit_tree() -> void:
@@ -68,6 +81,7 @@ func _exit_tree() -> void:
 
 
 func _emit_ready() -> void:
+	_reset_poll_backoff()
 	_send_event(
 		"ready",
 		{
@@ -82,6 +96,7 @@ func _emit_ready() -> void:
 func _on_node_added(node: Node) -> void:
 	if node == self:
 		return
+	_reset_poll_backoff()
 	_send_event(
 		"node_added",
 		{
@@ -97,6 +112,7 @@ func _on_node_added(node: Node) -> void:
 func _on_node_removed(node: Node) -> void:
 	if node == self:
 		return
+	_reset_poll_backoff()
 	_send_event(
 		"node_removed",
 		{
@@ -108,7 +124,7 @@ func _on_node_removed(node: Node) -> void:
 	call_deferred("_emit_audio_snapshot_if_changed", "node_removed")
 
 
-func _emit_runtime_snapshot_if_changed(reason: String) -> void:
+func _emit_runtime_snapshot_if_changed(reason: String) -> bool:
 	var payload := _build_runtime_snapshot(reason)
 	var serialized := JSON.stringify(
 		{
@@ -119,13 +135,14 @@ func _emit_runtime_snapshot_if_changed(reason: String) -> void:
 		}
 	)
 	if serialized == _last_runtime_snapshot_hash:
-		return
+		return false
 
 	_last_runtime_snapshot_hash = serialized
 	_send_event("runtime_snapshot", payload)
+	return true
 
 
-func _emit_audio_snapshot_if_changed(reason: String) -> void:
+func _emit_audio_snapshot_if_changed(reason: String) -> bool:
 	var payload := _build_audio_snapshot(reason)
 	var serialized := JSON.stringify(
 		{
@@ -136,10 +153,11 @@ func _emit_audio_snapshot_if_changed(reason: String) -> void:
 		}
 	)
 	if serialized == _last_audio_snapshot_hash:
-		return
+		return false
 
 	_last_audio_snapshot_hash = serialized
 	_send_event("audio_players_snapshot", payload)
+	return true
 
 
 func _build_runtime_snapshot(reason: String) -> Dictionary:
@@ -339,6 +357,7 @@ func _handle_pause_command(data: Array) -> void:
 
 
 func _handle_simulate_mouse_command(data: Array) -> void:
+	_reset_poll_backoff()
 	var params: Dictionary = data[0] if data.size() > 0 else {}
 	var action: String = params.get("action", "click")
 	var x: float = params.get("x", 0.0)
@@ -395,6 +414,7 @@ func _handle_simulate_mouse_command(data: Array) -> void:
 
 func _deferred_long_press_release(pos: Vector2, btn: MouseButton, delay: float) -> void:
 	await get_tree().create_timer(delay).timeout
+	_reset_poll_backoff()
 	var release_event := InputEventMouseButton.new()
 	release_event.position = pos
 	release_event.button_index = btn
@@ -431,6 +451,15 @@ func _parse_button(button_str: String) -> MouseButton:
 			return MOUSE_BUTTON_MIDDLE
 		_:
 			return MOUSE_BUTTON_LEFT
+
+
+func _get_current_snapshot_interval_sec() -> float:
+	return _idle_snapshot_interval_sec if _unchanged_poll_count >= STABLE_POLL_THRESHOLD else _snapshot_interval_sec
+
+
+func _reset_poll_backoff() -> void:
+	_snapshot_elapsed = 0.0
+	_unchanged_poll_count = 0
 
 
 func _collect_controls(node: Node) -> Array[Dictionary]:

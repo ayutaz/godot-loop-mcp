@@ -73,6 +73,8 @@ const RUNTIME_CONDITION_PREDICATES = [
   "less_than",
   "less_or_equal"
 ] as const;
+type RuntimeConditionPredicate = (typeof RUNTIME_CONDITION_PREDICATES)[number];
+
 const waitForRuntimeConditionArgsSchema = z.object({
   nodePath: z.string().min(1),
   propertyPath: z.string().min(1),
@@ -1188,24 +1190,12 @@ async function readAddonPayload(
   return result;
 }
 
-type RuntimeConditionPredicate =
-  | "equals"
-  | "not_equals"
-  | "contains"
-  | "truthy"
-  | "falsy"
-  | "exists"
-  | "greater_than"
-  | "greater_or_equal"
-  | "less_than"
-  | "less_or_equal";
-
 async function waitForRuntimeCondition(
   getActiveSession: () => AddonSession | undefined,
   options: {
     nodePath: string;
     propertyPath: string;
-    predicate: string;
+    predicate: RuntimeConditionPredicate | string;
     value: unknown;
     timeoutMs: number;
     pollIntervalMs: number;
@@ -1242,14 +1232,33 @@ async function waitForRuntimeCondition(
         });
       }
     } else {
-      lastObservation = observation.error;
+      return formatToolError({
+        available: false,
+        code:
+          typeof observation.error.code === "string"
+            ? observation.error.code
+            : "runtime_observation_failed",
+        reason:
+          typeof observation.error.reason === "string"
+            ? observation.error.reason
+            : "Failed to observe the runtime node property.",
+        nodePath: options.nodePath,
+        propertyPath: options.propertyPath,
+        predicate,
+        expected: options.value,
+        attempts,
+        elapsedMs: Date.now() - startedAt,
+        lastObservation: observation.error
+      });
     }
 
     await delay(pollIntervalMs);
   }
 
-  return formatToolError({
+  return formatToolResult({
     matched: false,
+    timedOut: true,
+    code: "timed_out",
     nodePath: options.nodePath,
     propertyPath: options.propertyPath,
     predicate,
@@ -1394,6 +1403,10 @@ function toolAccessDenied(
 
   return formatToolError({
     available: false,
+    code:
+      !session && entry.exposeWhenNoSession !== true
+        ? "no_ready_session"
+        : "tool_not_enabled",
     reason:
       !session && entry.exposeWhenNoSession !== true
         ? "No ready addon session."
@@ -1520,6 +1533,7 @@ function formatResourceResult(uri: string, payload: JsonObject): {
 function unavailablePayload(reason: string): JsonObject {
   return {
     available: false,
+    code: "no_ready_session",
     reason
   };
 }
@@ -1527,6 +1541,7 @@ function unavailablePayload(reason: string): JsonObject {
 function addonRequestErrorPayload(method: string, message: string): JsonObject {
   return {
     available: false,
+    code: "addon_request_failed",
     source: "addon",
     method,
     reason: message
@@ -1646,7 +1661,7 @@ function normalizeResourcePath(rawPath: string): string {
 function extractAuditStatus(result: unknown): "success" | "error" | "denied" {
   if (isJsonObject(result) && result.isError === true) {
     const structured = isJsonObject(result.structuredContent) ? result.structuredContent : undefined;
-    if (structured?.reason === "The tool is not enabled for the current addon capabilities or security level.") {
+    if (structured?.code === "tool_not_enabled") {
       return "denied";
     }
     return "error";

@@ -1,11 +1,11 @@
 import fs from "node:fs";
-import net from "node:net";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
+import { patchProjectFile, resolveBridgePort } from "./smokeUtils.ts";
 
 const SMOKE_RELATIVE_DIR = "codex-smoke/m4";
 const DEFAULT_BRIDGE_PORT = 6010;
@@ -27,8 +27,14 @@ async function main(): Promise<void> {
   const mockRunnerPath = path.join(repoRoot, "packages", "server", "src", "dev", "mockTestRunner.mjs");
   const projectFilePath = path.join(repoRoot, "project.godot");
   const originalProjectFile = fs.readFileSync(projectFilePath, "utf8");
-  const bridgePort = await resolveBridgePort();
-  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, bridgePort), "utf8");
+  const bridgePort = await resolveBridgePort(DEFAULT_BRIDGE_PORT, "the M4 smoke");
+  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, [
+    {
+      sectionName: "godot_loop_mcp",
+      entryPrefix: "bridge/port=",
+      entryValue: `bridge/port=${bridgePort}`
+    }
+  ]), "utf8");
   const transport = new StdioClientTransport({
     command: "node",
     args: ["--experimental-strip-types", "src/index.ts"],
@@ -168,78 +174,6 @@ async function main(): Promise<void> {
     fs.writeFileSync(projectFilePath, originalProjectFile, "utf8");
     fs.rmSync(smokeDir, { recursive: true, force: true });
   }
-}
-
-async function resolveBridgePort(): Promise<number> {
-  const explicitPort = process.env.GODOT_LOOP_MCP_SMOKE_BRIDGE_PORT ?? process.env.GODOT_LOOP_MCP_PORT;
-  if (explicitPort) {
-    const parsed = Number(explicitPort);
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
-      throw new Error(`Invalid bridge port override: ${explicitPort}`);
-    }
-    return parsed;
-  }
-
-  const preferredPort = await tryListenOnPort(DEFAULT_BRIDGE_PORT);
-  if (preferredPort !== undefined) {
-    return preferredPort;
-  }
-
-  const ephemeralPort = await tryListenOnPort(0);
-  if (ephemeralPort === undefined) {
-    throw new Error("Failed to allocate an available bridge port for the M4 smoke.");
-  }
-  return ephemeralPort;
-}
-
-function tryListenOnPort(port: number): Promise<number | undefined> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.unref();
-    server.once("error", () => {
-      resolve(undefined);
-    });
-    server.listen(port, "127.0.0.1", () => {
-      const address = server.address();
-      const resolvedPort = typeof address === "object" && address ? address.port : undefined;
-      server.close(() => resolve(resolvedPort));
-    });
-  });
-}
-
-function patchProjectFile(projectFile: string, bridgePort: number): string {
-  const newline = projectFile.includes("\r\n") ? "\r\n" : "\n";
-  const lines = projectFile.split(/\r?\n/u);
-  upsertSectionEntry(lines, "godot_loop_mcp", "bridge/port=", `bridge/port=${bridgePort}`);
-  return lines.join(newline);
-}
-
-function upsertSectionEntry(
-  lines: string[],
-  sectionName: string,
-  entryPrefix: string,
-  entryValue: string
-): void {
-  const header = `[${sectionName}]`;
-  const sectionIndex = lines.findIndex((line) => line.trim() === header);
-  if (sectionIndex >= 0) {
-    let cursor = sectionIndex + 1;
-    while (cursor < lines.length && !lines[cursor].startsWith("[")) {
-      if (lines[cursor].startsWith(entryPrefix)) {
-        lines[cursor] = entryValue;
-        return;
-      }
-      cursor += 1;
-    }
-    lines.splice(cursor, 0, entryValue);
-    return;
-  }
-
-  const needsTrailingNewline = lines.length > 0 && lines[lines.length - 1] !== "";
-  if (needsTrailingNewline) {
-    lines.push("");
-  }
-  lines.push(header, entryValue);
 }
 
 async function waitForProjectInfo(client: Client, timeoutMs: number): Promise<Record<string, unknown>> {
