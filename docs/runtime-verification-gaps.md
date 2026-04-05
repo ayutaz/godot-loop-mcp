@@ -1,7 +1,7 @@
 # Runtime Verification Gaps
 
 Status: 2026-04-05 時点で主要 gap は対応済みです。  
-実装は commit `17b8f92` (`Add runtime verification MCP tools`) に含まれます。  
+実装は「Add runtime verification MCP tools」の変更で追加されています。  
 この文書は、対応前に見つかった課題の記録として残します。
 
 更新日: 2026-04-05

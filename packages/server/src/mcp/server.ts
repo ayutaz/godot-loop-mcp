@@ -61,6 +61,26 @@ const EDITOR_CONSOLE_CAPTURE_CAPABILITY = "editor.console.capture";
 const ADDON_OUTPUT_LOG_METHOD = "godot.logs.get_output";
 const ADDON_ERROR_LOG_METHOD = "godot.logs.get_errors";
 const ADDON_CLEAR_LOGS_METHOD = "godot.logs.clear";
+const RUNTIME_CONDITION_PREDICATES = [
+  "equals",
+  "not_equals",
+  "contains",
+  "truthy",
+  "falsy",
+  "exists",
+  "greater_than",
+  "greater_or_equal",
+  "less_than",
+  "less_or_equal"
+] as const;
+const waitForRuntimeConditionArgsSchema = z.object({
+  nodePath: z.string().min(1),
+  propertyPath: z.string().min(1),
+  predicate: z.enum(RUNTIME_CONDITION_PREDICATES).optional(),
+  value: z.unknown().optional(),
+  timeoutMs: z.number().int().min(100).max(120000).optional(),
+  pollIntervalMs: z.number().int().min(50).max(5000).optional()
+});
 
 export function createMcpBridgeServer({
   config,
@@ -408,25 +428,7 @@ function registerTools(
     "wait_for_runtime_condition",
     {
       description: "Poll a running-scene node property until a predicate matches or times out.",
-      inputSchema: {
-        nodePath: z.string().min(1),
-        propertyPath: z.string().min(1),
-        predicate: z.enum([
-          "equals",
-          "not_equals",
-          "contains",
-          "truthy",
-          "falsy",
-          "exists",
-          "greater_than",
-          "greater_or_equal",
-          "less_than",
-          "less_or_equal"
-        ]).optional(),
-        value: z.unknown().optional(),
-        timeoutMs: z.number().int().min(100).max(120000).optional(),
-        pollIntervalMs: z.number().int().min(50).max(5000).optional()
-      }
+      inputSchema: waitForRuntimeConditionArgsSchema.shape
     },
     async (args: JsonObject = {}) =>
       auditedCall("tool", "wait_for_runtime_condition", args, config, auditLogger, getActiveSession, async () => {
@@ -435,18 +437,25 @@ function registerTools(
           return denial;
         }
 
+        const parsedArgs = waitForRuntimeConditionArgsSchema.safeParse(args);
+        if (!parsedArgs.success) {
+          return formatToolError({
+            available: false,
+            reason: "Invalid arguments for wait_for_runtime_condition",
+            code: "invalid_arguments",
+            details: parsedArgs.error.flatten()
+          });
+        }
+
         return waitForRuntimeCondition(
           getActiveSession,
           {
-            nodePath: typeof args.nodePath === "string" ? args.nodePath : "",
-            propertyPath: typeof args.propertyPath === "string" ? args.propertyPath : "",
-            predicate:
-              typeof args.predicate === "string"
-                ? args.predicate
-                : "equals",
-            value: args.value,
-            timeoutMs: typeof args.timeoutMs === "number" ? args.timeoutMs : 10_000,
-            pollIntervalMs: typeof args.pollIntervalMs === "number" ? args.pollIntervalMs : 250
+            nodePath: parsedArgs.data.nodePath,
+            propertyPath: parsedArgs.data.propertyPath,
+            predicate: parsedArgs.data.predicate ?? "equals",
+            value: parsedArgs.data.value,
+            timeoutMs: parsedArgs.data.timeoutMs ?? 10_000,
+            pollIntervalMs: parsedArgs.data.pollIntervalMs ?? 250
           }
         );
       })

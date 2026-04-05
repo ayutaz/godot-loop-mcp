@@ -2,7 +2,8 @@ extends Node
 
 const MESSAGE_PREFIX := "godot_loop_mcp"
 const CMD_PREFIX := "godot_loop_mcp_cmd"
-const SNAPSHOT_INTERVAL_SEC := 0.25
+const DEFAULT_SNAPSHOT_INTERVAL_SEC := 0.25
+const SNAPSHOT_INTERVAL_SETTING := "godot_loop_mcp/runtime/snapshot_interval_sec"
 const TRACKED_PROPERTY_NAMES := [
 	"text",
 	"disabled",
@@ -18,15 +19,23 @@ const TRACKED_PROPERTY_NAMES := [
 ]
 
 var _snapshot_elapsed := 0.0
+var _snapshot_interval_sec := DEFAULT_SNAPSHOT_INTERVAL_SEC
 var _last_runtime_snapshot_hash := ""
 var _last_audio_snapshot_hash := ""
+var _property_presence_cache := {}
 
 
 func _ready() -> void:
 	if not EngineDebugger.is_active():
 		return
 
-	EngineDebugger.register_message_capture(CMD_PREFIX, _on_editor_command)
+	_snapshot_interval_sec = maxf(
+		float(ProjectSettings.get_setting(SNAPSHOT_INTERVAL_SETTING, DEFAULT_SNAPSHOT_INTERVAL_SEC)),
+		0.05
+	)
+	var capture_registration: Variant = EngineDebugger.call("register_message_capture", CMD_PREFIX, _on_editor_command)
+	if typeof(capture_registration) == TYPE_BOOL and not bool(capture_registration):
+		push_warning("Failed to register debugger message capture for '%s'; editor commands may be unavailable." % CMD_PREFIX)
 
 	get_tree().node_added.connect(_on_node_added)
 	get_tree().node_removed.connect(_on_node_removed)
@@ -39,7 +48,7 @@ func _process(delta: float) -> void:
 		return
 
 	_snapshot_elapsed += delta
-	if _snapshot_elapsed < SNAPSHOT_INTERVAL_SEC:
+	if _snapshot_elapsed < _snapshot_interval_sec:
 		return
 
 	_snapshot_elapsed = 0.0
@@ -101,7 +110,14 @@ func _on_node_removed(node: Node) -> void:
 
 func _emit_runtime_snapshot_if_changed(reason: String) -> void:
 	var payload := _build_runtime_snapshot(reason)
-	var serialized := JSON.stringify(payload)
+	var serialized := JSON.stringify(
+		{
+			"currentScenePath": payload.get("currentScenePath", ""),
+			"rootPath": payload.get("rootPath", ""),
+			"nodeCount": payload.get("nodeCount", 0),
+			"nodes": payload.get("nodes", [])
+		}
+	)
 	if serialized == _last_runtime_snapshot_hash:
 		return
 
@@ -111,7 +127,14 @@ func _emit_runtime_snapshot_if_changed(reason: String) -> void:
 
 func _emit_audio_snapshot_if_changed(reason: String) -> void:
 	var payload := _build_audio_snapshot(reason)
-	var serialized := JSON.stringify(payload)
+	var serialized := JSON.stringify(
+		{
+			"currentScenePath": payload.get("currentScenePath", ""),
+			"playerCount": payload.get("playerCount", 0),
+			"activePlayerCount": payload.get("activePlayerCount", 0),
+			"players": payload.get("players", [])
+		}
+	)
 	if serialized == _last_audio_snapshot_hash:
 		return
 
@@ -237,10 +260,22 @@ func _is_audio_player(node: Node) -> bool:
 
 
 func _has_property(target: Object, property_name: String) -> bool:
-	for property_info in target.get_property_list():
-		if str(property_info.get("name", "")) == property_name:
-			return true
-	return false
+	var cache_key := _get_property_cache_key(target)
+	if not _property_presence_cache.has(cache_key):
+		var property_names := {}
+		for property_info in target.get_property_list():
+			property_names[str(property_info.get("name", ""))] = true
+		_property_presence_cache[cache_key] = property_names
+
+	return bool((_property_presence_cache[cache_key] as Dictionary).get(property_name, false))
+
+
+func _get_property_cache_key(target: Object) -> String:
+	var script_path := ""
+	var script_ref: Variant = target.get_script()
+	if script_ref is Resource:
+		script_path = str(script_ref.resource_path)
+	return "%s|%s" % [target.get_class(), script_path]
 
 
 func _serialize_variant(value: Variant) -> Variant:

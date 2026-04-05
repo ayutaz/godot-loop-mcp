@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -18,7 +19,7 @@ import {
 const SMOKE_RELATIVE_DIR = "codex-smoke/m4-gui";
 const AUTOLOAD_NAME = "GodotLoopMcpRuntimeTelemetry";
 const AUTOLOAD_VALUE = "\"*res://addons/godot_loop_mcp/runtime/runtime_telemetry.gd\"";
-const BRIDGE_PORT = 6012;
+const DEFAULT_BRIDGE_PORT = 6012;
 
 async function main(): Promise<void> {
   const packageRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -30,12 +31,13 @@ async function main(): Promise<void> {
 
   const smokeDir = path.join(repoRoot, SMOKE_RELATIVE_DIR);
   fs.rmSync(smokeDir, { recursive: true, force: true });
+  const bridgePort = await resolveBridgePort();
 
   const scenePath = `res://${SMOKE_RELATIVE_DIR.replace(/\\/gu, "/")}/m4_gui_scene.tscn`;
   const logDir = path.join(repoRoot, ".godot", "mcp");
   const projectFilePath = path.join(repoRoot, "project.godot");
   const originalProjectFile = fs.readFileSync(projectFilePath, "utf8");
-  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile), "utf8");
+  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, bridgePort), "utf8");
 
   const transport = new StdioClientTransport({
     command: "node",
@@ -44,7 +46,7 @@ async function main(): Promise<void> {
     env: {
       ...process.env,
       GODOT_LOOP_MCP_LOG_DIR: logDir,
-      GODOT_LOOP_MCP_PORT: String(BRIDGE_PORT)
+      GODOT_LOOP_MCP_PORT: String(bridgePort)
     },
     stderr: "inherit"
   });
@@ -316,12 +318,49 @@ function resolveGodotGuiBinaryPath(): string {
   return "";
 }
 
-function patchProjectFile(projectFile: string): string {
+async function resolveBridgePort(): Promise<number> {
+  const explicitPort = process.env.GODOT_LOOP_MCP_SMOKE_BRIDGE_PORT ?? process.env.GODOT_LOOP_MCP_PORT;
+  if (explicitPort) {
+    const parsed = Number(explicitPort);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      throw new Error(`Invalid bridge port override: ${explicitPort}`);
+    }
+    return parsed;
+  }
+
+  const preferredPort = await tryListenOnPort(DEFAULT_BRIDGE_PORT);
+  if (preferredPort !== undefined) {
+    return preferredPort;
+  }
+
+  const ephemeralPort = await tryListenOnPort(0);
+  if (ephemeralPort === undefined) {
+    throw new Error("Failed to allocate an available bridge port for the M4 GUI smoke.");
+  }
+  return ephemeralPort;
+}
+
+function tryListenOnPort(port: number): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref();
+    server.once("error", () => {
+      resolve(undefined);
+    });
+    server.listen(port, "127.0.0.1", () => {
+      const address = server.address();
+      const resolvedPort = typeof address === "object" && address ? address.port : undefined;
+      server.close(() => resolve(resolvedPort));
+    });
+  });
+}
+
+function patchProjectFile(projectFile: string, bridgePort: number): string {
   const newline = projectFile.includes("\r\n") ? "\r\n" : "\n";
   const lines = projectFile.split(/\r?\n/u);
   const autoloadEntry = `${AUTOLOAD_NAME}=${AUTOLOAD_VALUE}`;
   upsertSectionEntry(lines, "autoload", `${AUTOLOAD_NAME}=`, autoloadEntry);
-  upsertSectionEntry(lines, "godot_loop_mcp", "bridge/port=", `bridge/port=${BRIDGE_PORT}`);
+  upsertSectionEntry(lines, "godot_loop_mcp", "bridge/port=", `bridge/port=${bridgePort}`);
   return lines.join(newline);
 }
 
