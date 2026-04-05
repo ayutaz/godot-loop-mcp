@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   McpServer,
   ResourceTemplate,
@@ -9,6 +10,7 @@ import {
   type RegisteredTool
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { isDeepStrictEqual } from "node:util";
 import * as z from "zod/v4";
 import { AuditLogger, hashAuditArgs } from "../auditLogger.ts";
 import { SERVER_VERSION } from "../capabilities/serverManifest.ts";
@@ -59,6 +61,28 @@ const EDITOR_CONSOLE_CAPTURE_CAPABILITY = "editor.console.capture";
 const ADDON_OUTPUT_LOG_METHOD = "godot.logs.get_output";
 const ADDON_ERROR_LOG_METHOD = "godot.logs.get_errors";
 const ADDON_CLEAR_LOGS_METHOD = "godot.logs.clear";
+const RUNTIME_CONDITION_PREDICATES = [
+  "equals",
+  "not_equals",
+  "contains",
+  "truthy",
+  "falsy",
+  "exists",
+  "greater_than",
+  "greater_or_equal",
+  "less_than",
+  "less_or_equal"
+] as const;
+type RuntimeConditionPredicate = (typeof RUNTIME_CONDITION_PREDICATES)[number];
+
+const waitForRuntimeConditionArgsSchema = z.object({
+  nodePath: z.string().min(1),
+  propertyPath: z.string().min(1),
+  predicate: z.enum(RUNTIME_CONDITION_PREDICATES).optional(),
+  value: z.unknown().optional(),
+  timeoutMs: z.number().int().min(100).max(120000).optional(),
+  pollIntervalMs: z.number().int().min(50).max(5000).optional()
+});
 
 export function createMcpBridgeServer({
   config,
@@ -380,6 +404,71 @@ function registerTools(
       limit: z.number().int().min(1).max(500).optional()
     }
   }, "godot.runtime.get_events");
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_running_scene_tree", {
+    description: "Return the latest captured tree for the currently running scene."
+  }, "godot.runtime.get_tree");
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_running_node", {
+    description: "Read a node snapshot from the currently running scene by node path.",
+    inputSchema: {
+      nodePath: z.string().min(1)
+    }
+  }, "godot.runtime.get_node");
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_running_node_property", {
+    description: "Read a property value from the latest running-scene node snapshot.",
+    inputSchema: {
+      nodePath: z.string().min(1),
+      propertyPath: z.string().min(1)
+    }
+  }, "godot.runtime.get_node_property");
+
+  registerTool(
+    registry,
+    server,
+    "wait_for_runtime_condition",
+    {
+      description: "Poll a running-scene node property until a predicate matches or times out.",
+      inputSchema: waitForRuntimeConditionArgsSchema.shape
+    },
+    async (args: JsonObject = {}) =>
+      auditedCall("tool", "wait_for_runtime_condition", args, config, auditLogger, getActiveSession, async () => {
+        const denial = toolAccessDenied("wait_for_runtime_condition", config, getActiveSession);
+        if (denial) {
+          return denial;
+        }
+
+        const parsedArgs = waitForRuntimeConditionArgsSchema.safeParse(args);
+        if (!parsedArgs.success) {
+          return formatToolError({
+            available: false,
+            reason: "Invalid arguments for wait_for_runtime_condition",
+            code: "invalid_arguments",
+            details: parsedArgs.error.flatten()
+          });
+        }
+
+        return waitForRuntimeCondition(
+          getActiveSession,
+          {
+            nodePath: parsedArgs.data.nodePath,
+            propertyPath: parsedArgs.data.propertyPath,
+            predicate: parsedArgs.data.predicate ?? "equals",
+            value: parsedArgs.data.value,
+            timeoutMs: parsedArgs.data.timeoutMs ?? 10_000,
+            pollIntervalMs: parsedArgs.data.pollIntervalMs ?? 250
+          }
+        );
+      })
+  );
+
+  registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "get_running_audio_players", {
+    description: "Return the latest captured AudioStreamPlayer playback state from the running scene.",
+    inputSchema: {
+      playingOnly: z.boolean().optional()
+    }
+  }, "godot.runtime.get_audio_players");
 
   registerBridgeTool(registry, server, config, auditLogger, getActiveSession, "clear_runtime_debug_events", {
     description: "Clear buffered runtime telemetry events."
@@ -918,7 +1007,7 @@ function registerResourceTemplate(
 function syncCatalogExposure(
   registry: CatalogRegistry,
   serverSecurityLevel: SecurityLevel,
-  session?: AddonSession
+  _session?: AddonSession
 ): void {
   for (const toolEntry of MCP_TOOLS) {
     const registeredTool = registry.tools.get(toolEntry.name);
@@ -926,7 +1015,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(toolEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(toolEntry, serverSecurityLevel);
     if (registeredTool.enabled !== shouldEnable) {
       shouldEnable ? registeredTool.enable() : registeredTool.disable();
     }
@@ -938,7 +1027,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(resourceEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(resourceEntry, serverSecurityLevel);
     if (registeredResource.enabled !== shouldEnable) {
       shouldEnable ? registeredResource.enable() : registeredResource.disable();
     }
@@ -950,7 +1039,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(promptEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(promptEntry, serverSecurityLevel);
     if (registeredPrompt.enabled !== shouldEnable) {
       shouldEnable ? registeredPrompt.enable() : registeredPrompt.disable();
     }
@@ -962,7 +1051,7 @@ function syncCatalogExposure(
       continue;
     }
 
-    const shouldEnable = shouldExposeEntry(templateEntry, serverSecurityLevel, session);
+    const shouldEnable = shouldAdvertiseEntry(templateEntry, serverSecurityLevel);
     if (registeredTemplate.enabled !== shouldEnable) {
       shouldEnable ? registeredTemplate.enable() : registeredTemplate.disable();
     }
@@ -1101,6 +1190,175 @@ async function readAddonPayload(
   return result;
 }
 
+async function waitForRuntimeCondition(
+  getActiveSession: () => AddonSession | undefined,
+  options: {
+    nodePath: string;
+    propertyPath: string;
+    predicate: RuntimeConditionPredicate | string;
+    value: unknown;
+    timeoutMs: number;
+    pollIntervalMs: number;
+  }
+): Promise<ReturnType<typeof formatToolResult> | ReturnType<typeof formatToolError>> {
+  const predicate = normalizeRuntimePredicate(options.predicate);
+  const timeoutMs = clampNumber(options.timeoutMs, 100, 120_000, 10_000);
+  const pollIntervalMs = clampNumber(options.pollIntervalMs, 50, 5_000, 250);
+  const startedAt = Date.now();
+  let attempts = 0;
+  let lastObservation: JsonObject | undefined;
+
+  while (Date.now() - startedAt <= timeoutMs) {
+    attempts += 1;
+    const observation = await callAddonPayload(getActiveSession, "godot.runtime.get_node_property", {
+      nodePath: options.nodePath,
+      propertyPath: options.propertyPath
+    });
+
+    if (observation.ok) {
+      lastObservation = observation.payload;
+      const value = observation.payload.value;
+      if (matchesRuntimeCondition(value, predicate, options.value)) {
+        return formatToolResult({
+          matched: true,
+          nodePath: options.nodePath,
+          propertyPath: options.propertyPath,
+          predicate,
+          expected: options.value,
+          value,
+          attempts,
+          elapsedMs: Date.now() - startedAt,
+          capturedAt: observation.payload.capturedAt
+        });
+      }
+    } else {
+      return formatToolError({
+        available: false,
+        code:
+          typeof observation.error.code === "string"
+            ? observation.error.code
+            : "runtime_observation_failed",
+        reason:
+          typeof observation.error.reason === "string"
+            ? observation.error.reason
+            : "Failed to observe the runtime node property.",
+        nodePath: options.nodePath,
+        propertyPath: options.propertyPath,
+        predicate,
+        expected: options.value,
+        attempts,
+        elapsedMs: Date.now() - startedAt,
+        lastObservation: observation.error
+      });
+    }
+
+    await delay(pollIntervalMs);
+  }
+
+  return formatToolResult({
+    matched: false,
+    timedOut: true,
+    code: "timed_out",
+    nodePath: options.nodePath,
+    propertyPath: options.propertyPath,
+    predicate,
+    expected: options.value,
+    attempts,
+    timeoutMs,
+    elapsedMs: Date.now() - startedAt,
+    lastObservation
+  });
+}
+
+function normalizeRuntimePredicate(predicate: string): RuntimeConditionPredicate {
+  switch (predicate) {
+    case "not_equals":
+    case "contains":
+    case "truthy":
+    case "falsy":
+    case "exists":
+    case "greater_than":
+    case "greater_or_equal":
+    case "less_than":
+    case "less_or_equal":
+      return predicate;
+    case "equals":
+    default:
+      return "equals";
+  }
+}
+
+function matchesRuntimeCondition(
+  actualValue: unknown,
+  predicate: RuntimeConditionPredicate,
+  expectedValue: unknown
+): boolean {
+  switch (predicate) {
+    case "equals":
+      return isDeepStrictEqual(actualValue, expectedValue);
+    case "not_equals":
+      return !isDeepStrictEqual(actualValue, expectedValue);
+    case "contains":
+      return String(actualValue ?? "").includes(String(expectedValue ?? ""));
+    case "truthy":
+      return Boolean(actualValue);
+    case "falsy":
+      return !Boolean(actualValue);
+    case "exists":
+      return actualValue !== undefined && actualValue !== null;
+    case "greater_than":
+      return compareNumbers(actualValue, expectedValue, (left, right) => left > right);
+    case "greater_or_equal":
+      return compareNumbers(actualValue, expectedValue, (left, right) => left >= right);
+    case "less_than":
+      return compareNumbers(actualValue, expectedValue, (left, right) => left < right);
+    case "less_or_equal":
+      return compareNumbers(actualValue, expectedValue, (left, right) => left <= right);
+    default:
+      return false;
+  }
+}
+
+function compareNumbers(
+  leftValue: unknown,
+  rightValue: unknown,
+  comparator: (left: number, right: number) => boolean
+): boolean {
+  const left = toComparableNumber(leftValue);
+  const right = toComparableNumber(rightValue);
+  if (left === undefined || right === undefined) {
+    return false;
+  }
+
+  return comparator(left, right);
+}
+
+function toComparableNumber(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
+function clampNumber(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
+
 async function auditedCall<T>(
   kind: "tool" | "resource" | "prompt",
   name: string,
@@ -1160,20 +1418,38 @@ function toolAccessDenied(
     return undefined;
   }
 
-  if (shouldExposeEntry(entry, config.securityLevel, getActiveSession())) {
+  const session = getActiveSession();
+  if (isEntryUsable(entry, config.securityLevel, session)) {
     return undefined;
   }
 
   return formatToolError({
     available: false,
-    reason: "The tool is not enabled for the current addon capabilities or security level.",
+    code:
+      !session && entry.exposeWhenNoSession !== true
+        ? "no_ready_session"
+        : "tool_not_enabled",
+    reason:
+      !session && entry.exposeWhenNoSession !== true
+        ? "No ready addon session."
+        : "The tool is not enabled for the current addon capabilities or security level.",
     tool: toolName,
     serverSecurityLevel: config.securityLevel,
-    addonSecurityLevel: getActiveSession()?.getSecurityLevel() ?? "ReadOnly"
+    addonSecurityLevel: session?.getSecurityLevel() ?? "ReadOnly"
   });
 }
 
-function shouldExposeEntry(
+function shouldAdvertiseEntry(
+  entry: {
+    minimumSecurityLevel?: SecurityLevel;
+  },
+  serverSecurityLevel: SecurityLevel
+): boolean {
+  const requiredSecurityLevel = entry.minimumSecurityLevel ?? "ReadOnly";
+  return hasRequiredSecurity(requiredSecurityLevel, serverSecurityLevel);
+}
+
+function isEntryUsable(
   entry: {
     exposeWhenNoSession?: boolean;
     requiredCapabilities?: string[];
@@ -1279,6 +1555,7 @@ function formatResourceResult(uri: string, payload: JsonObject): {
 function unavailablePayload(reason: string): JsonObject {
   return {
     available: false,
+    code: "no_ready_session",
     reason
   };
 }
@@ -1286,6 +1563,7 @@ function unavailablePayload(reason: string): JsonObject {
 function addonRequestErrorPayload(method: string, message: string): JsonObject {
   return {
     available: false,
+    code: "addon_request_failed",
     source: "addon",
     method,
     reason: message
@@ -1405,7 +1683,7 @@ function normalizeResourcePath(rawPath: string): string {
 function extractAuditStatus(result: unknown): "success" | "error" | "denied" {
   if (isJsonObject(result) && result.isError === true) {
     const structured = isJsonObject(result.structuredContent) ? result.structuredContent : undefined;
-    if (structured?.reason === "The tool is not enabled for the current addon capabilities or security level.") {
+    if (structured?.code === "tool_not_enabled") {
       return "denied";
     }
     return "error";
@@ -1427,3 +1705,8 @@ function buildPromptEnvironmentSummary(
   const addonSecurity = session?.getSecurityLevel() ?? "ReadOnly";
   return `Security: server=${serverSecurityLevel}, addon=${addonSecurity}.`;
 }
+
+export const __test__ = {
+  matchesRuntimeCondition,
+  toComparableNumber
+};

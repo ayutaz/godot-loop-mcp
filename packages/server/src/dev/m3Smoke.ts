@@ -5,8 +5,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
+import { patchProjectFile, resolveBridgePort } from "./smokeUtils.ts";
 
 const SMOKE_RELATIVE_DIR = "codex-smoke/m3";
+const DEFAULT_BRIDGE_PORT = 6010;
 
 async function main(): Promise<void> {
   const packageRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -24,13 +26,24 @@ async function main(): Promise<void> {
   const scriptPath = `res://${SMOKE_RELATIVE_DIR.replace(/\\/gu, "/")}/m3_smoke_agent.gd`;
   const uniqueToken = `m3-search-token-${Date.now()}`;
   const logDir = path.join(repoRoot, ".godot", "mcp");
+  const projectFilePath = path.join(repoRoot, "project.godot");
+  const originalProjectFile = fs.readFileSync(projectFilePath, "utf8");
+  const bridgePort = await resolveBridgePort(DEFAULT_BRIDGE_PORT, "the M3 smoke");
+  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, [
+    {
+      sectionName: "godot_loop_mcp",
+      entryPrefix: "bridge/port=",
+      entryValue: `bridge/port=${bridgePort}`
+    }
+  ]), "utf8");
   const transport = new StdioClientTransport({
     command: "node",
     args: ["--experimental-strip-types", "src/index.ts"],
     cwd: packageRoot,
     env: {
       ...process.env,
-      GODOT_LOOP_MCP_LOG_DIR: logDir
+      GODOT_LOOP_MCP_LOG_DIR: logDir,
+      GODOT_LOOP_MCP_PORT: String(bridgePort)
     },
     stderr: "inherit"
   });
@@ -44,15 +57,24 @@ async function main(): Promise<void> {
   try {
     await client.connect(transport);
 
-    console.error("Checking pre-session dynamic catalog...");
+    console.error("Checking stable startup catalog...");
     const initialTools = await client.listTools();
     assertContains(initialTools.tools.map((tool) => tool.name), "get_output_logs", "initial tool list");
-    assertNotContains(initialTools.tools.map((tool) => tool.name), "get_project_info", "initial tool list");
-    assertNotContains(initialTools.tools.map((tool) => tool.name), "search_project", "initial tool list");
+    assertContains(initialTools.tools.map((tool) => tool.name), "get_project_info", "initial tool list");
+    assertContains(initialTools.tools.map((tool) => tool.name), "search_project", "initial tool list");
 
     const initialResources = await client.listResources();
     assertContains(initialResources.resources.map((resource) => resource.uri), "godot://errors/latest", "initial resource list");
-    assertNotContains(initialResources.resources.map((resource) => resource.uri), "godot://project/info", "initial resource list");
+    assertContains(initialResources.resources.map((resource) => resource.uri), "godot://project/info", "initial resource list");
+
+    const preSessionProjectInfo = await callToolJson(client, "get_project_info", undefined, { allowToolError: true });
+    if (
+      !preSessionProjectInfo.isError ||
+      preSessionProjectInfo.payload.available !== false ||
+      preSessionProjectInfo.payload.code !== "no_ready_session"
+    ) {
+      throw new Error(`get_project_info must report no ready addon session before Godot starts: ${JSON.stringify(preSessionProjectInfo.payload)}`);
+    }
 
     godotProcess = spawn(
       godotBinaryPath,
@@ -67,8 +89,7 @@ async function main(): Promise<void> {
     assertString(projectInfo.projectName, "projectName");
     assertString(projectInfo.godotVersion, "godotVersion");
 
-    console.error("Checking post-session dynamic catalog...");
-    await waitForToolVisibility(client, "search_project", true, 15_000);
+    console.error("Checking post-session tool readiness...");
     const readyTools = await client.listTools();
     assertContains(readyTools.tools.map((tool) => tool.name), "search_project", "ready tool list");
     assertContains(readyTools.tools.map((tool) => tool.name), "get_uid", "ready tool list");
@@ -178,6 +199,7 @@ async function main(): Promise<void> {
     await client.close().catch(() => undefined);
     await transport.close().catch(() => undefined);
     await resumeProjectScanConflicts(scanQuarantineState).catch(() => undefined);
+    fs.writeFileSync(projectFilePath, originalProjectFile, "utf8");
     fs.rmSync(smokeDir, { recursive: true, force: true });
   }
 }

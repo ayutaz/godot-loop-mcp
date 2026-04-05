@@ -249,6 +249,35 @@ export const MCP_TOOLS: McpToolCatalogEntry[] = [
     requiredCapabilities: ["runtime.debug"]
   },
   {
+    name: "get_running_scene_tree",
+    bridgeMethod: "godot.runtime.get_tree",
+    description: "Return the latest captured tree for the currently running scene.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "get_running_node",
+    bridgeMethod: "godot.runtime.get_node",
+    description: "Read a node snapshot from the currently running scene by node path.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "get_running_node_property",
+    bridgeMethod: "godot.runtime.get_node_property",
+    description: "Read a property value from the latest running-scene node snapshot.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "wait_for_runtime_condition",
+    description: "Poll a running-scene node property until a predicate matches or times out.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
+    name: "get_running_audio_players",
+    bridgeMethod: "godot.runtime.get_audio_players",
+    description: "Return the latest captured AudioStreamPlayer playback state from the running scene.",
+    requiredCapabilities: ["runtime.debug"]
+  },
+  {
     name: "clear_runtime_debug_events",
     bridgeMethod: "godot.runtime.clear_events",
     description: "Clear buffered runtime telemetry events.",
@@ -425,65 +454,65 @@ export function buildMcpCatalog(options: {
 export function listEnabledToolEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpToolCatalogEntry[] {
-  return MCP_TOOLS.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_TOOLS.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function listEnabledResourceEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpResourceCatalogEntry[] {
-  return MCP_RESOURCES.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_RESOURCES.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function listEnabledPromptEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpPromptCatalogEntry[] {
-  return MCP_PROMPTS.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_PROMPTS.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function listEnabledResourceTemplateEntries(options: {
   context?: CatalogExposureContext | undefined;
 } = {}): McpResourceTemplateCatalogEntry[] {
-  return MCP_RESOURCE_TEMPLATES.filter((entry) => isCatalogEntryEnabled(entry, options.context));
+  const context = resolveExposureContext(options.context);
+  return MCP_RESOURCE_TEMPLATES.filter((entry) => isCatalogEntryEnabled(entry, context));
 }
 
 export function isToolEntryEnabled(
   entry: McpToolCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 export function isResourceEntryEnabled(
   entry: McpResourceCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 export function isPromptEntryEnabled(
   entry: McpPromptCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 export function isResourceTemplateEntryEnabled(
   entry: McpResourceTemplateCatalogEntry,
   context?: CatalogExposureContext
 ): boolean {
-  return isCatalogEntryEnabled(entry, context);
+  return isCatalogEntryEnabled(entry, resolveExposureContext(context));
 }
 
 function isCatalogEntryEnabled(
   entry: McpCatalogEntryBase,
-  context?: CatalogExposureContext
+  context: CatalogExposureContext
 ): boolean {
-  if (!hasRequiredSecurity(entry.minimumSecurityLevel ?? READ_ONLY, context?.getSecurityLevel() ?? READ_ONLY)) {
+  if (!hasRequiredSecurity(entry.minimumSecurityLevel ?? READ_ONLY, context.getSecurityLevel())) {
     return false;
-  }
-
-  if (!context) {
-    return entry.exposeWhenNoSession === true;
   }
 
   const requiredCapabilities = entry.requiredCapabilities ?? [];
@@ -497,17 +526,30 @@ function hasRequiredSecurity(requiredLevel: SecurityLevel, actualLevel: Security
 function createStaticExposureContext(
   capabilities?: CapabilityLookup,
   securityLevel: SecurityLevel = READ_ONLY
-): CatalogExposureContext | undefined {
-  if (!capabilities) {
-    return undefined;
-  }
-
+): CatalogExposureContext {
   return {
     hasCapability(capabilityId: string): boolean {
-      return capabilities.hasCapability(capabilityId);
+      return capabilities ? capabilities.hasCapability(capabilityId) : true;
     },
     getSecurityLevel(): SecurityLevel {
       return securityLevel;
     }
   };
+}
+
+function createMinimalExposureContext(
+  securityLevel: SecurityLevel = READ_ONLY
+): CatalogExposureContext {
+  return {
+    hasCapability(): boolean {
+      return false;
+    },
+    getSecurityLevel(): SecurityLevel {
+      return securityLevel;
+    }
+  };
+}
+
+function resolveExposureContext(context?: CatalogExposureContext): CatalogExposureContext {
+  return context ?? createMinimalExposureContext();
 }

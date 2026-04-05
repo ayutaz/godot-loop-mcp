@@ -5,8 +5,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
+import { patchProjectFile, resolveBridgePort } from "./smokeUtils.ts";
 
 const SMOKE_RELATIVE_DIR = "codex-smoke/m4";
+const DEFAULT_BRIDGE_PORT = 6010;
 
 async function main(): Promise<void> {
   const packageRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -23,13 +25,24 @@ async function main(): Promise<void> {
   const scriptPath = `res://${SMOKE_RELATIVE_DIR.replace(/\\/gu, "/")}/m4_smoke_agent.gd`;
   const logDir = path.join(repoRoot, ".godot", "mcp");
   const mockRunnerPath = path.join(repoRoot, "packages", "server", "src", "dev", "mockTestRunner.mjs");
+  const projectFilePath = path.join(repoRoot, "project.godot");
+  const originalProjectFile = fs.readFileSync(projectFilePath, "utf8");
+  const bridgePort = await resolveBridgePort(DEFAULT_BRIDGE_PORT, "the M4 smoke");
+  fs.writeFileSync(projectFilePath, patchProjectFile(originalProjectFile, [
+    {
+      sectionName: "godot_loop_mcp",
+      entryPrefix: "bridge/port=",
+      entryValue: `bridge/port=${bridgePort}`
+    }
+  ]), "utf8");
   const transport = new StdioClientTransport({
     command: "node",
     args: ["--experimental-strip-types", "src/index.ts"],
     cwd: packageRoot,
     env: {
       ...process.env,
-      GODOT_LOOP_MCP_LOG_DIR: logDir
+      GODOT_LOOP_MCP_LOG_DIR: logDir,
+      GODOT_LOOP_MCP_PORT: String(bridgePort)
     },
     stderr: "inherit"
   });
@@ -64,9 +77,24 @@ async function main(): Promise<void> {
     assertNotContains(toolNames, "execute_editor_script", "tool list");
     assertNotContains(toolNames, "filesystem_write_raw", "tool list");
     assertNotContains(toolNames, "os_shell", "tool list");
-    assertNotContains(toolNames, "get_editor_screenshot", "tool list");
-    assertNotContains(toolNames, "get_running_scene_screenshot", "tool list");
-    assertNotContains(toolNames, "get_runtime_debug_events", "tool list");
+    assertContains(toolNames, "get_editor_screenshot", "tool list");
+    assertContains(toolNames, "get_running_scene_screenshot", "tool list");
+    assertContains(toolNames, "get_runtime_debug_events", "tool list");
+
+    const headlessScreenshot = await callToolJson(client, "get_editor_screenshot", undefined, { allowToolError: true });
+    if (!headlessScreenshot.isError || headlessScreenshot.payload.available !== false) {
+      throw new Error(`get_editor_screenshot must stay visible but reject headless sessions: ${JSON.stringify(headlessScreenshot.payload)}`);
+    }
+
+    const headlessRuntimeEvents = await callToolJson(
+      client,
+      "get_runtime_debug_events",
+      { limit: 5 },
+      { allowToolError: true }
+    );
+    if (!headlessRuntimeEvents.isError || headlessRuntimeEvents.payload.available !== false) {
+      throw new Error(`get_runtime_debug_events must stay visible but reject unavailable runtime capture: ${JSON.stringify(headlessRuntimeEvents.payload)}`);
+    }
 
     const prompts = await client.listPrompts();
     const promptNames = prompts.prompts.map((prompt) => prompt.name);
@@ -143,6 +171,7 @@ async function main(): Promise<void> {
     await client.close().catch(() => undefined);
     await transport.close().catch(() => undefined);
     await resumeProjectScanConflicts(scanQuarantineState).catch(() => undefined);
+    fs.writeFileSync(projectFilePath, originalProjectFile, "utf8");
     fs.rmSync(smokeDir, { recursive: true, force: true });
   }
 }

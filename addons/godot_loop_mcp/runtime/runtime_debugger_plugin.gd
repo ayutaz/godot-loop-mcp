@@ -13,7 +13,7 @@ func _init(capture_store) -> void:
 
 
 func _has_capture(capture: String) -> bool:
-	return capture == MESSAGE_PREFIX
+	return capture == MESSAGE_PREFIX or capture.begins_with("%s:" % MESSAGE_PREFIX)
 
 
 func _capture(message: String, data: Array, session_id: int) -> bool:
@@ -32,6 +32,8 @@ func _session_started(session_id: int) -> void:
 
 func _session_stopped() -> void:
 	_active_session_id = -1
+	if _capture_store != null and _capture_store.has_method("clear_live_snapshots"):
+		_capture_store.clear_live_snapshots()
 
 
 # ---------------------------------------------------------------------------
