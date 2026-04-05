@@ -34,15 +34,18 @@ if ($pluginVersion -ne $expectedVersion) {
   throw "addons/godot_loop_mcp/plugin.cfg version must match $ReleaseTag. actual='$pluginVersion'"
 }
 
-$addonCapabilityRegistryVersionLine = Get-Content -LiteralPath $addonCapabilityRegistryPath | Where-Object { $_ -match '^const PLUGIN_VERSION := "([^"]+)"$' } | Select-Object -First 1
-if ([string]::IsNullOrWhiteSpace($addonCapabilityRegistryVersionLine)) {
-  throw "addons/godot_loop_mcp/capabilities/capability_registry.gd is missing a PLUGIN_VERSION line."
-}
-
-$addonCapabilityRegistryVersionMatch = [regex]::Match($addonCapabilityRegistryVersionLine, '^const PLUGIN_VERSION := "([^"]+)"$')
-$addonCapabilityRegistryVersion = $addonCapabilityRegistryVersionMatch.Groups[1].Value
-if ($addonCapabilityRegistryVersion -ne $expectedVersion) {
-  throw "addons/godot_loop_mcp/capabilities/capability_registry.gd PLUGIN_VERSION must match $ReleaseTag. actual='$addonCapabilityRegistryVersion'"
+$addonCapabilityRegistryVersionLine = Get-Content -LiteralPath $addonCapabilityRegistryPath | Where-Object {
+  $_ -match '^\s*const PLUGIN_VERSION := "([^"]+)"$'
+} | Select-Object -First 1
+if (-not [string]::IsNullOrWhiteSpace($addonCapabilityRegistryVersionLine)) {
+  $addonCapabilityRegistryVersionMatch = [regex]::Match(
+    $addonCapabilityRegistryVersionLine,
+    '^\s*const PLUGIN_VERSION := "([^"]+)"$'
+  )
+  $addonCapabilityRegistryVersion = $addonCapabilityRegistryVersionMatch.Groups[1].Value
+  if ($addonCapabilityRegistryVersion -ne $expectedVersion) {
+    throw "addons/godot_loop_mcp/capabilities/capability_registry.gd PLUGIN_VERSION must match $ReleaseTag. actual='$addonCapabilityRegistryVersion'"
+  }
 }
 
 $readmeExpectations = @(

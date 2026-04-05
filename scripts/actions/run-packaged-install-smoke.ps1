@@ -19,6 +19,11 @@ if ([string]::IsNullOrWhiteSpace($ArtifactsDir)) {
 Ensure-EmptyDirectory -Path $ArtifactsDir
 $packageOutputDir = Join-Path $ArtifactsDir "packages"
 Ensure-EmptyDirectory -Path $packageOutputDir
+$expectedAddonVersion = if ($PackageVersion.StartsWith("v")) { $PackageVersion.Substring(1) } else { $PackageVersion }
+$bridgePortListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$bridgePortListener.Start()
+$bridgePort = ([System.Net.IPEndPoint]$bridgePortListener.LocalEndpoint).Port
+$bridgePortListener.Stop()
 
 ./scripts/actions/package-addon.ps1 -RepoRoot $RepoRoot -Version $PackageVersion -OutputDir $packageOutputDir
 $addonArchive = Get-ChildItem -LiteralPath $packageOutputDir -Filter "godot-loop-mcp-addon-*.zip" | Select-Object -First 1
@@ -58,6 +63,27 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot "project.godot") -Destination (Join-
 Copy-Item -LiteralPath (Join-Path $RepoRoot "icon.svg") -Destination (Join-Path $tempProjectRoot "icon.svg") -Force
 Expand-Archive -LiteralPath $addonArchive.FullName -DestinationPath $tempProjectRoot -Force
 
+$tempProjectFilePath = Join-Path $tempProjectRoot "project.godot"
+$tempProjectFileContent = Get-Content -LiteralPath $tempProjectFilePath -Raw
+if ($tempProjectFileContent -match '(?ms)^\[godot_loop_mcp\]\r?\n') {
+  if ($tempProjectFileContent -match '(?m)^bridge/port=\d+\s*$') {
+    $tempProjectFileContent = [regex]::Replace($tempProjectFileContent, '(?m)^bridge/port=\d+\s*$', "bridge/port=$bridgePort")
+  }
+  else {
+    $tempProjectFileContent = [regex]::Replace(
+      $tempProjectFileContent,
+      '(?ms)(^\[godot_loop_mcp\]\r?\n)',
+      ('$1bridge/port={0}{1}' -f $bridgePort, [Environment]::NewLine),
+      1
+    )
+  }
+}
+else {
+  $tempProjectFileContent = $tempProjectFileContent.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine +
+    "[godot_loop_mcp]" + [Environment]::NewLine + "bridge/port=$bridgePort" + [Environment]::NewLine
+}
+Set-Content -LiteralPath $tempProjectFilePath -Value $tempProjectFileContent -Encoding utf8
+
 $installedPluginPath = Join-Path $tempProjectRoot "addons/godot_loop_mcp/plugin.cfg"
 if (-not (Test-Path -LiteralPath $installedPluginPath)) {
   throw "Packaged addon did not install plugin.cfg into the temporary Godot project."
@@ -94,11 +120,13 @@ $godotProcess = $null
 $originalBridgeOnly = $env:GODOT_LOOP_MCP_BRIDGE_ONLY
 $originalLogDir = $env:GODOT_LOOP_MCP_LOG_DIR
 $originalRepoRoot = $env:GODOT_LOOP_MCP_REPO_ROOT
+$originalPort = $env:GODOT_LOOP_MCP_PORT
 
 try {
   $env:GODOT_LOOP_MCP_BRIDGE_ONLY = "1"
   $env:GODOT_LOOP_MCP_LOG_DIR = $mcpLogDir
   $env:GODOT_LOOP_MCP_REPO_ROOT = $tempProjectRoot
+  $env:GODOT_LOOP_MCP_PORT = "$bridgePort"
 
   $serverProcess = Start-Process -FilePath "node" `
     -ArgumentList @($serverEntryPoint) `
@@ -140,6 +168,9 @@ try {
   Wait-FileContainsString -Path $serverStderrPath -Needle "Addon handshake completed." -TimeoutSeconds 20
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted."
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed."
+  Assert-FileContainsString `
+    -Path $serverFileLogPath `
+    -Needle ('"addon":{{"name":"godot-loop-mcp-addon","version":"{0}"}}' -f $expectedAddonVersion)
 }
 finally {
   if ($null -ne $godotProcess -and -not $godotProcess.HasExited) {
@@ -170,5 +201,12 @@ finally {
   }
   else {
     $env:GODOT_LOOP_MCP_REPO_ROOT = $originalRepoRoot
+  }
+
+  if ($null -eq $originalPort) {
+    Remove-Item Env:GODOT_LOOP_MCP_PORT -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:GODOT_LOOP_MCP_PORT = $originalPort
   }
 }
