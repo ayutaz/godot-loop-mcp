@@ -386,13 +386,15 @@ func _unregister_runtime_debugger_plugin() -> void:
 func _append_log(level: String, message: String, context: Dictionary = {}) -> void:
 	var normalized_level := level.to_upper()
 	var payload := "[godot-loop-mcp][%s] %s" % [normalized_level, message]
-	if PluginSettings.should_emit_log(level, PluginSettings.read_console_log_level()):
+	var console_log_level := PluginSettings.read_console_log_level()
+	var file_log_level := PluginSettings.read_file_log_level()
+	if PluginSettings.should_emit_log(level, console_log_level):
 		if context.is_empty():
 			print(payload)
 		else:
 			print("%s %s" % [payload, JSON.stringify(context)])
 
-	if not PluginSettings.should_emit_log(level, PluginSettings.read_file_log_level()):
+	if not PluginSettings.should_emit_log(level, file_log_level):
 		return
 
 	var log_dir := ProjectSettings.globalize_path(LOG_DIR)

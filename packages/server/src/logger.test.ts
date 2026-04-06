@@ -19,12 +19,16 @@ class CaptureStream extends Writable {
   }
 }
 
-test("default logger keeps console output quiet while retaining detailed file logs", () => {
+test("logger configured with quiet-default thresholds keeps console output quiet while retaining detailed file logs", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "godot-loop-mcp-logger-"));
   try {
     const logFilePath = path.join(tempDir, "server.log");
     const output = new CaptureStream();
-    const logger = new Logger(logFilePath, { output });
+    const logger = new Logger(logFilePath, {
+      output,
+      consoleLevel: "warn",
+      fileLevel: "debug",
+    });
 
     logger.debug("Debug only message.", { source: "test" });
     logger.info("Info message.");
