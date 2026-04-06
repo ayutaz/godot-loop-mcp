@@ -301,14 +301,6 @@ export class AddonSession {
       return;
     }
 
-    if (pending.method === "bridge.ping") {
-      this.logger.debug("Addon ping acknowledged.", {
-        sessionId: this.sessionId,
-        rttMs: Date.now() - pending.sentAtMs
-      });
-      return;
-    }
-
     if (pending.resolve) {
       pending.resolve(message.result);
     }

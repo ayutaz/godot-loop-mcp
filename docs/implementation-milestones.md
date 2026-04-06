@@ -57,7 +57,7 @@ godot_console.exe --headless --editor --quit-after 240 --path .
 
 期待値:
 
-- addon log: `Bridge handshake completed`, `Ping acknowledged`
+- addon log: `Bridge handshake completed`
 - server log: `Addon hello accepted`, `Addon handshake completed`
 
 ### M1

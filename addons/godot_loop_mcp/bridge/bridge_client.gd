@@ -226,9 +226,6 @@ func _handle_response(message: Dictionary) -> void:
 					"server": _server_identity.get("product", {})
 				}
 			)
-		"bridge.ping":
-			var rtt_ms := Time.get_ticks_msec() - int(pending.get("sent_at_ms", Time.get_ticks_msec()))
-			_emit_log("debug", "Ping acknowledged.", {"rtt_ms": rtt_ms})
 
 
 func _send_request(method: String, params: Dictionary = {}) -> String:

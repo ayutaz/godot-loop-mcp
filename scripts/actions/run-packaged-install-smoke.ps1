@@ -176,7 +176,6 @@ try {
   }
 
   Wait-FileContainsString -Path $addonLogPath -Needle "Bridge handshake completed." -TimeoutSeconds 20
-  Wait-FileContainsString -Path $addonLogPath -Needle "Ping acknowledged." -TimeoutSeconds 20
   Wait-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted." -TimeoutSeconds 20
   Wait-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed." -TimeoutSeconds 20
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted."
