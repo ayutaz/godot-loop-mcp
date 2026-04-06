@@ -52,7 +52,7 @@ try {
     -RedirectStandardError $serverStderrPath `
     -PassThru
 
-  Wait-FileContainsString -Path $serverStderrPath -Needle "bridge server listening." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverFileLogPath -Needle "bridge server listening." -TimeoutSeconds 20
 
   $godotArguments = @(
     "--headless",
@@ -81,8 +81,8 @@ try {
 
   Wait-FileContainsString -Path $addonLogPath -Needle "Bridge handshake completed." -TimeoutSeconds 20
   Wait-FileContainsString -Path $addonLogPath -Needle "Ping acknowledged." -TimeoutSeconds 20
-  Wait-FileContainsString -Path $serverStderrPath -Needle "Addon hello accepted." -TimeoutSeconds 20
-  Wait-FileContainsString -Path $serverStderrPath -Needle "Addon handshake completed." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed." -TimeoutSeconds 20
 
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted."
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed."
