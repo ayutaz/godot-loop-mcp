@@ -288,6 +288,20 @@ func _register_project_settings() -> void:
 		"ReadOnly,WorkspaceWrite,Dangerous"
 	)
 	_register_project_setting(
+		PluginSettings.SETTING_CONSOLE_LOG_LEVEL,
+		PluginSettings.DEFAULT_CONSOLE_LOG_LEVEL,
+		TYPE_STRING,
+		PROPERTY_HINT_ENUM,
+		"Debug,Info,Warn,Error,Silent"
+	)
+	_register_project_setting(
+		PluginSettings.SETTING_FILE_LOG_LEVEL,
+		PluginSettings.DEFAULT_FILE_LOG_LEVEL,
+		TYPE_STRING,
+		PROPERTY_HINT_ENUM,
+		"Debug,Info,Warn,Error,Silent"
+	)
+	_register_project_setting(
 		PluginSettings.SETTING_TESTS_ADAPTER,
 		"Auto",
 		TYPE_STRING,
@@ -370,11 +384,16 @@ func _unregister_runtime_debugger_plugin() -> void:
 
 
 func _append_log(level: String, message: String, context: Dictionary = {}) -> void:
-	var payload := "[godot-loop-mcp][%s] %s" % [level.to_upper(), message]
-	if context.is_empty():
-		print(payload)
-	else:
-		print("%s %s" % [payload, JSON.stringify(context)])
+	var normalized_level := level.to_upper()
+	var payload := "[godot-loop-mcp][%s] %s" % [normalized_level, message]
+	if PluginSettings.should_emit_log(level, PluginSettings.read_console_log_level()):
+		if context.is_empty():
+			print(payload)
+		else:
+			print("%s %s" % [payload, JSON.stringify(context)])
+
+	if not PluginSettings.should_emit_log(level, PluginSettings.read_file_log_level()):
+		return
 
 	var log_dir := ProjectSettings.globalize_path(LOG_DIR)
 	var dir_error := DirAccess.make_dir_recursive_absolute(log_dir)
@@ -395,7 +414,7 @@ func _append_log(level: String, message: String, context: Dictionary = {}) -> vo
 
 	var line := "%s [%s] %s" % [
 		Time.get_datetime_string_from_system(true),
-		level.to_upper(),
+		normalized_level,
 		message
 	]
 	if not context.is_empty():

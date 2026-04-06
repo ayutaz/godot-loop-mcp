@@ -16,6 +16,12 @@ npx @godot-loop-mcp/server
 
 If the current directory is not the Godot project root, set `GODOT_LOOP_MCP_REPO_ROOT`.
 
+## Logging
+
+- Default console output is `WARN` and above so MCP clients do not get flooded with heartbeat chatter
+- Detailed logs still go to `.godot/mcp/*.log` with a default file threshold of `DEBUG`
+- Override thresholds with `GODOT_LOOP_MCP_CONSOLE_LOG_LEVEL` and `GODOT_LOOP_MCP_FILE_LOG_LEVEL`
+
 ## Local development
 
 ```powershell

@@ -49,6 +49,12 @@ npx @godot-loop-mcp/server
 
 project root 以外から起動する場合は `GODOT_LOOP_MCP_REPO_ROOT` を設定します。
 
+## Logging
+
+- 既定では CLI / editor console への出力は `Warn` 以上に抑え、詳細ログは `.godot/mcp/*.log` に残します
+- server / proxy / daemon の閾値は `GODOT_LOOP_MCP_CONSOLE_LOG_LEVEL` と `GODOT_LOOP_MCP_FILE_LOG_LEVEL` で上書きできます
+- addon の閾値は `Project Settings > godot_loop_mcp/log/console_level` と `godot_loop_mcp/log/file_level`、または同名 env で上書きできます
+
 ## クイックスタート
 
 server:
