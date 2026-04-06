@@ -49,6 +49,12 @@ npx @godot-loop-mcp/server
 
 If not, set `GODOT_LOOP_MCP_REPO_ROOT` explicitly.
 
+## Logging
+
+- By default, CLI / editor-console output is limited to `Warn` and above, while detailed logs remain in `.godot/mcp/*.log`
+- Override server / proxy / daemon thresholds with `GODOT_LOOP_MCP_CONSOLE_LOG_LEVEL` and `GODOT_LOOP_MCP_FILE_LOG_LEVEL`
+- Override addon thresholds with `Project Settings > godot_loop_mcp/log/console_level` and `godot_loop_mcp/log/file_level`, or the same env vars
+
 ## Quick start
 
 server:

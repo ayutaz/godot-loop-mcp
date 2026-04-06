@@ -11,7 +11,12 @@ $ErrorActionPreference = "Stop"
 Ensure-EmptyDirectory -Path $LogDir
 $stdoutPath = Join-Path $LogDir "server-stdout.log"
 $stderrPath = Join-Path $LogDir "server-stderr.log"
+$serverFileLogPath = Join-Path $LogDir "server.log"
 $serverWorkdir = Join-Path $RepoRoot "packages/server"
+$bridgePortListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$bridgePortListener.Start()
+$bridgePort = ([System.Net.IPEndPoint]$bridgePortListener.LocalEndpoint).Port
+$bridgePortListener.Stop()
 $serverEntrypoint = if (Test-Path -LiteralPath (Join-Path $serverWorkdir "dist/index.js")) {
   @("dist/index.js")
 }
@@ -20,8 +25,10 @@ else {
 }
 $originalBridgeOnly = $env:GODOT_LOOP_MCP_BRIDGE_ONLY
 $originalLogDir = $env:GODOT_LOOP_MCP_LOG_DIR
+$originalPort = $env:GODOT_LOOP_MCP_PORT
 $env:GODOT_LOOP_MCP_BRIDGE_ONLY = "1"
 $env:GODOT_LOOP_MCP_LOG_DIR = $LogDir
+$env:GODOT_LOOP_MCP_PORT = "$bridgePort"
 
 $process = $null
 try {
@@ -31,7 +38,7 @@ try {
     -RedirectStandardOutput $stdoutPath `
     -RedirectStandardError $stderrPath `
     -PassThru
-  Wait-FileContainsString -Path $stderrPath -Needle "bridge server listening." -TimeoutSeconds 20
+  Wait-FileContainsString -Path $serverFileLogPath -Needle "bridge server listening." -TimeoutSeconds 20
 }
 finally {
   if ($null -ne $process -and -not $process.HasExited) {
@@ -56,5 +63,11 @@ finally {
   }
   else {
     $env:GODOT_LOOP_MCP_LOG_DIR = $originalLogDir
+  }
+  if ($null -eq $originalPort) {
+    Remove-Item Env:GODOT_LOOP_MCP_PORT -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:GODOT_LOOP_MCP_PORT = $originalPort
   }
 }

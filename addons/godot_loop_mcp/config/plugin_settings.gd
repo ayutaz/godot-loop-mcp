@@ -3,8 +3,13 @@ extends RefCounted
 
 const SECURITY_LEVELS := ["ReadOnly", "WorkspaceWrite", "Dangerous"]
 const DEFAULT_SECURITY_LEVEL := "WorkspaceWrite"
+const LOG_LEVELS := ["Debug", "Info", "Warn", "Error", "Silent"]
+const DEFAULT_CONSOLE_LOG_LEVEL := "Warn"
+const DEFAULT_FILE_LOG_LEVEL := "Debug"
 
 const SETTING_SECURITY_LEVEL := "godot_loop_mcp/security/level"
+const SETTING_CONSOLE_LOG_LEVEL := "godot_loop_mcp/log/console_level"
+const SETTING_FILE_LOG_LEVEL := "godot_loop_mcp/log/file_level"
 const SETTING_TESTS_ADAPTER := "godot_loop_mcp/tests/adapter"
 const SETTING_TESTS_CUSTOM_COMMAND := "godot_loop_mcp/tests/custom_command"
 const SETTING_TESTS_CUSTOM_ARGS_JSON := "godot_loop_mcp/tests/custom_args_json"
@@ -14,6 +19,8 @@ const SETTING_DANGEROUS_ALLOWED_WRITE_PREFIXES := "godot_loop_mcp/dangerous/allo
 const SETTING_DANGEROUS_ALLOWED_SHELL_COMMANDS := "godot_loop_mcp/dangerous/allowed_shell_commands"
 
 const ENV_SECURITY_LEVEL := "GODOT_LOOP_MCP_SECURITY_LEVEL"
+const ENV_CONSOLE_LOG_LEVEL := "GODOT_LOOP_MCP_CONSOLE_LOG_LEVEL"
+const ENV_FILE_LOG_LEVEL := "GODOT_LOOP_MCP_FILE_LOG_LEVEL"
 const ENV_TESTS_ADAPTER := "GODOT_LOOP_MCP_TEST_ADAPTER"
 const ENV_TESTS_CUSTOM_COMMAND := "GODOT_LOOP_MCP_TEST_COMMAND"
 const ENV_TESTS_CUSTOM_ARGS_JSON := "GODOT_LOOP_MCP_TEST_ARGS"
@@ -30,6 +37,32 @@ static func read_security_level() -> String:
 	return _normalize_security_level(
 		str(ProjectSettings.get_setting(SETTING_SECURITY_LEVEL, DEFAULT_SECURITY_LEVEL))
 	)
+
+
+static func read_console_log_level() -> String:
+	var env_value := _normalize_log_level(OS.get_environment(ENV_CONSOLE_LOG_LEVEL))
+	if env_value != "":
+		return env_value
+	var setting_value := _normalize_log_level(
+		str(ProjectSettings.get_setting(SETTING_CONSOLE_LOG_LEVEL, DEFAULT_CONSOLE_LOG_LEVEL))
+	)
+	return setting_value if setting_value != "" else DEFAULT_CONSOLE_LOG_LEVEL
+
+
+static func read_file_log_level() -> String:
+	var env_value := _normalize_log_level(OS.get_environment(ENV_FILE_LOG_LEVEL))
+	if env_value != "":
+		return env_value
+	var setting_value := _normalize_log_level(
+		str(ProjectSettings.get_setting(SETTING_FILE_LOG_LEVEL, DEFAULT_FILE_LOG_LEVEL))
+	)
+	return setting_value if setting_value != "" else DEFAULT_FILE_LOG_LEVEL
+
+
+static func should_emit_log(level: String, threshold: String) -> bool:
+	var level_index := LOG_LEVELS.find(_normalize_log_level(level))
+	var threshold_index := LOG_LEVELS.find(_normalize_log_level(threshold))
+	return level_index >= 0 and threshold_index >= 0 and level_index >= threshold_index
 
 
 static func is_security_level_at_least(required_level: String) -> bool:
@@ -105,6 +138,25 @@ static func _normalize_security_level(value: String) -> String:
 		if candidate.to_lower() == normalized.to_lower():
 			return candidate
 	return DEFAULT_SECURITY_LEVEL if normalized == "" else ""
+
+
+static func _normalize_log_level(value: String) -> String:
+	var normalized := value.strip_edges().to_lower()
+	match normalized:
+		"":
+			return ""
+		"debug":
+			return "Debug"
+		"info", "information":
+			return "Info"
+		"warn", "warning":
+			return "Warn"
+		"error":
+			return "Error"
+		"silent", "off", "none":
+			return "Silent"
+		_:
+			return ""
 
 
 static func _normalize_adapter(value: String) -> String:
