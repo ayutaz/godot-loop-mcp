@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { buildMcpCatalog, type CapabilityLookup } from "../mcp/catalog.ts";
 import type {
   CapabilityManifest,
@@ -6,12 +5,10 @@ import type {
   ReconnectPolicy,
   SecurityLevel
 } from "../transport/types.ts";
-
-const require = createRequire(import.meta.url);
-const packageJson = require("../../package.json") as { version?: string };
+import { SERVER_VERSION } from "../version.ts";
 
 export const PROTOCOL_VERSION = "0.1.0";
-export const SERVER_VERSION = packageJson.version ?? "0.0.0";
+export { SERVER_VERSION };
 
 export function buildServerCapabilityManifest(securityLevel: SecurityLevel): CapabilityManifest {
   return {
