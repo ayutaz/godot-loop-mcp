@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   });
   const client = new Client({
     name: "godot-loop-mcp-m3-smoke",
-    version: "0.3.0"
+    version: "0.3.1"
   });
 
   let godotProcess: ChildProcess | undefined;
