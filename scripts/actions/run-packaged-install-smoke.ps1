@@ -19,6 +19,10 @@ if ([string]::IsNullOrWhiteSpace($ArtifactsDir)) {
 Ensure-EmptyDirectory -Path $ArtifactsDir
 $packageOutputDir = Join-Path $ArtifactsDir "packages"
 Ensure-EmptyDirectory -Path $packageOutputDir
+$bridgePortListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$bridgePortListener.Start()
+$bridgePort = ([System.Net.IPEndPoint]$bridgePortListener.LocalEndpoint).Port
+$bridgePortListener.Stop()
 
 ./scripts/actions/package-addon.ps1 -RepoRoot $RepoRoot -Version $PackageVersion -OutputDir $packageOutputDir
 $addonArchive = Get-ChildItem -LiteralPath $packageOutputDir -Filter "godot-loop-mcp-addon-*.zip" | Select-Object -First 1
@@ -58,10 +62,45 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot "project.godot") -Destination (Join-
 Copy-Item -LiteralPath (Join-Path $RepoRoot "icon.svg") -Destination (Join-Path $tempProjectRoot "icon.svg") -Force
 Expand-Archive -LiteralPath $addonArchive.FullName -DestinationPath $tempProjectRoot -Force
 
+$tempProjectFilePath = Join-Path $tempProjectRoot "project.godot"
+$tempProjectFileContent = Get-Content -LiteralPath $tempProjectFilePath -Raw
+if ($tempProjectFileContent -match '(?ms)^\[godot_loop_mcp\]\r?\n') {
+  $bridgePortRegex = [regex]::new('(?m)^bridge/port=\d+\s*$')
+  $godotLoopMcpSectionRegex = [regex]::new('(?ms)(^\[godot_loop_mcp\]\r?\n)')
+  if ($tempProjectFileContent -match '(?m)^bridge/port=\d+\s*$') {
+    $tempProjectFileContent = $bridgePortRegex.Replace(
+      $tempProjectFileContent,
+      "bridge/port=$bridgePort",
+      1
+    )
+  }
+  else {
+    $sectionReplacement = '$1' + "bridge/port=$bridgePort" + [Environment]::NewLine
+    $tempProjectFileContent = $godotLoopMcpSectionRegex.Replace(
+      $tempProjectFileContent,
+      $sectionReplacement,
+      1
+    )
+  }
+}
+else {
+  $tempProjectFileContent = $tempProjectFileContent.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine +
+    "[godot_loop_mcp]" + [Environment]::NewLine + "bridge/port=$bridgePort" + [Environment]::NewLine
+}
+Set-Content -LiteralPath $tempProjectFilePath -Value $tempProjectFileContent -Encoding utf8
+
 $installedPluginPath = Join-Path $tempProjectRoot "addons/godot_loop_mcp/plugin.cfg"
 if (-not (Test-Path -LiteralPath $installedPluginPath)) {
   throw "Packaged addon did not install plugin.cfg into the temporary Godot project."
 }
+$installedPluginVersionLine = Get-Content -LiteralPath $installedPluginPath | Where-Object {
+  $_ -match '^version="([^"]+)"$'
+} | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($installedPluginVersionLine)) {
+  throw "Installed addon plugin.cfg is missing a version line."
+}
+$installedPluginVersionMatch = [regex]::Match($installedPluginVersionLine, '^version="([^"]+)"$')
+$expectedAddonVersion = $installedPluginVersionMatch.Groups[1].Value
 
 $workspacePackageJson = Join-Path $tempNodeWorkspace "package.json"
 Set-Content -LiteralPath $workspacePackageJson -Value "{`"name`":`"godot-loop-mcp-packaged-smoke`",`"private`":true}" -Encoding ascii
@@ -94,11 +133,13 @@ $godotProcess = $null
 $originalBridgeOnly = $env:GODOT_LOOP_MCP_BRIDGE_ONLY
 $originalLogDir = $env:GODOT_LOOP_MCP_LOG_DIR
 $originalRepoRoot = $env:GODOT_LOOP_MCP_REPO_ROOT
+$originalPort = $env:GODOT_LOOP_MCP_PORT
 
 try {
   $env:GODOT_LOOP_MCP_BRIDGE_ONLY = "1"
   $env:GODOT_LOOP_MCP_LOG_DIR = $mcpLogDir
   $env:GODOT_LOOP_MCP_REPO_ROOT = $tempProjectRoot
+  $env:GODOT_LOOP_MCP_PORT = "$bridgePort"
 
   $serverProcess = Start-Process -FilePath "node" `
     -ArgumentList @($serverEntryPoint) `
@@ -140,6 +181,10 @@ try {
   Wait-FileContainsString -Path $serverStderrPath -Needle "Addon handshake completed." -TimeoutSeconds 20
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon hello accepted."
   Assert-FileContainsString -Path $serverFileLogPath -Needle "Addon handshake completed."
+  $addonIdentityNeedle = '"addon":{"name":"godot-loop-mcp-addon","version":"' + $expectedAddonVersion + '"}'
+  Assert-FileContainsString `
+    -Path $serverFileLogPath `
+    -Needle $addonIdentityNeedle
 }
 finally {
   if ($null -ne $godotProcess -and -not $godotProcess.HasExited) {
@@ -170,5 +215,12 @@ finally {
   }
   else {
     $env:GODOT_LOOP_MCP_REPO_ROOT = $originalRepoRoot
+  }
+
+  if ($null -eq $originalPort) {
+    Remove-Item Env:GODOT_LOOP_MCP_PORT -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:GODOT_LOOP_MCP_PORT = $originalPort
   }
 }

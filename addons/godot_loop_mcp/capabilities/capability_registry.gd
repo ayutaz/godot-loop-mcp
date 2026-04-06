@@ -4,7 +4,8 @@ extends RefCounted
 const PluginSettings = preload("res://addons/godot_loop_mcp/config/plugin_settings.gd")
 
 const PROTOCOL_VERSION := "0.1.0"
-const PLUGIN_VERSION := "0.1.3"
+const PLUGIN_CONFIG_PATH := "res://addons/godot_loop_mcp/plugin.cfg"
+const UNKNOWN_PLUGIN_VERSION := "0.0.0"
 
 
 func build_manifest(capability_overrides: Dictionary = {}, security_level: String = "") -> Dictionary:
@@ -168,7 +169,7 @@ func build_client_identity(
 		"role": "addon",
 		"product": {
 			"name": "godot-loop-mcp-addon",
-			"version": PLUGIN_VERSION
+			"version": _read_plugin_version()
 		},
 		"godot": {
 			"version": godot_version,
@@ -199,3 +200,11 @@ func _capability_availability(
 	if not PluginSettings.is_security_level_at_least(required_security_level):
 		return "disabled"
 	return str(capability_overrides.get(capability_id, default_availability))
+
+
+func _read_plugin_version() -> String:
+	var plugin_config := ConfigFile.new()
+	var load_error := plugin_config.load(PLUGIN_CONFIG_PATH)
+	if load_error != OK:
+		return UNKNOWN_PLUGIN_VERSION
+	return str(plugin_config.get_value("plugin", "version", UNKNOWN_PLUGIN_VERSION))

@@ -1,6 +1,6 @@
 # godot-loop-mcp 実装マイルストーン
 
-更新日: 2026-03-15
+更新日: 2026-04-06
 
 この文書は現在の milestone 状態と quick reference の source of truth です。  
 詳細な設計理由は `docs/godot-4.4-mcp-technical-research.md`、CI/CD 運用は `docs/github-actions-cicd-plan.md` を参照してください。
@@ -10,8 +10,8 @@
 - サポート対象: `Godot 4.4+`
 - server 要件: `Node.js 22.14.0+`
 - 最新公開版:
-  - GitHub Release: `v0.2.0`
-  - npm: `@godot-loop-mcp/server@0.2.0`
+  - GitHub Release: `v0.3.0`
+  - npm: `@godot-loop-mcp/server@0.3.0`
 - 配布形態:
   - Addon は GitHub Release ZIP
   - server は npm package
