@@ -19,7 +19,6 @@ if ([string]::IsNullOrWhiteSpace($ArtifactsDir)) {
 Ensure-EmptyDirectory -Path $ArtifactsDir
 $packageOutputDir = Join-Path $ArtifactsDir "packages"
 Ensure-EmptyDirectory -Path $packageOutputDir
-$expectedAddonVersion = if ($PackageVersion.StartsWith("v")) { $PackageVersion.Substring(1) } else { $PackageVersion }
 $bridgePortListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $bridgePortListener.Start()
 $bridgePort = ([System.Net.IPEndPoint]$bridgePortListener.LocalEndpoint).Port
@@ -94,6 +93,14 @@ $installedPluginPath = Join-Path $tempProjectRoot "addons/godot_loop_mcp/plugin.
 if (-not (Test-Path -LiteralPath $installedPluginPath)) {
   throw "Packaged addon did not install plugin.cfg into the temporary Godot project."
 }
+$installedPluginVersionLine = Get-Content -LiteralPath $installedPluginPath | Where-Object {
+  $_ -match '^version="([^"]+)"$'
+} | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($installedPluginVersionLine)) {
+  throw "Installed addon plugin.cfg is missing a version line."
+}
+$installedPluginVersionMatch = [regex]::Match($installedPluginVersionLine, '^version="([^"]+)"$')
+$expectedAddonVersion = $installedPluginVersionMatch.Groups[1].Value
 
 $workspacePackageJson = Join-Path $tempNodeWorkspace "package.json"
 Set-Content -LiteralPath $workspacePackageJson -Value "{`"name`":`"godot-loop-mcp-packaged-smoke`",`"private`":true}" -Encoding ascii
