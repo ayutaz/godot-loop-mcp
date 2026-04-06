@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { resumeProjectScanConflicts, suspendProjectScanConflicts } from "./projectScanQuarantine.ts";
+import { SERVER_VERSION } from "../version.ts";
 
 const SMOKE_RELATIVE_DIR = "codex-smoke/danger";
 
@@ -33,7 +34,7 @@ async function main(): Promise<void> {
   });
   const client = new Client({
     name: "godot-loop-mcp-m6-smoke",
-    version: "0.3.0"
+    version: SERVER_VERSION
   });
 
   let godotProcess: ChildProcess | undefined;
