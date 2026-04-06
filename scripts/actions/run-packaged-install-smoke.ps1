@@ -66,14 +66,19 @@ Expand-Archive -LiteralPath $addonArchive.FullName -DestinationPath $tempProject
 $tempProjectFilePath = Join-Path $tempProjectRoot "project.godot"
 $tempProjectFileContent = Get-Content -LiteralPath $tempProjectFilePath -Raw
 if ($tempProjectFileContent -match '(?ms)^\[godot_loop_mcp\]\r?\n') {
+  $bridgePortRegex = [regex]::new('(?m)^bridge/port=\d+\s*$')
+  $godotLoopMcpSectionRegex = [regex]::new('(?ms)(^\[godot_loop_mcp\]\r?\n)')
   if ($tempProjectFileContent -match '(?m)^bridge/port=\d+\s*$') {
-    $tempProjectFileContent = [regex]::Replace($tempProjectFileContent, '(?m)^bridge/port=\d+\s*$', "bridge/port=$bridgePort")
+    $tempProjectFileContent = $bridgePortRegex.Replace(
+      $tempProjectFileContent,
+      "bridge/port=$bridgePort",
+      1
+    )
   }
   else {
     $sectionReplacement = '$1' + "bridge/port=$bridgePort" + [Environment]::NewLine
-    $tempProjectFileContent = [regex]::Replace(
+    $tempProjectFileContent = $godotLoopMcpSectionRegex.Replace(
       $tempProjectFileContent,
-      '(?ms)(^\[godot_loop_mcp\]\r?\n)',
       $sectionReplacement,
       1
     )
